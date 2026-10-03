@@ -144,6 +144,9 @@ class SettingsSearchCoverageTest {
         "player_subtitles_connected_user", "player_subtitles_delete_action", "player_subtitles_sign_in",
         "player_subtitles_sign_out", "settings_open_subtitles_advanced", "settings_open_subtitles_setup_local",
         "settings_open_subtitles_setup_remote",
+        // Transient bulk-import error popup on Manage sources: not a setting, so search
+        // must not land on it. ("Import from file" is covered by a real search entry instead.)
+        "settings_bulk_import_parse_error",
     )
 
     @Test

@@ -374,6 +374,16 @@ internal fun videoQuickBinding(key: String, vm: SettingsViewModel): VideoQuickBi
             val on by vm.directTune.collectAsStateWithLifecycle()
             toggle(onOff(on), on) { vm.setDirectTune(!on) }
         }
+        "vp_server_hop" -> {
+            // Failover prefs live in app-local SharedPreferences (FailoverPrefs), not in the
+            // SettingsViewModel, so the pin reads the same store directly — same toggle, same value.
+            val context = LocalContext.current
+            var on by remember { mutableStateOf(FailoverPrefs.isEnabled(context)) }
+            toggle(onOff(on), on) {
+                FailoverPrefs.setEnabled(context, !on)
+                on = !on
+            }
+        }
         "vp_live_left_right" -> {
             val on by vm.liveLeftRightRewinds.collectAsStateWithLifecycle()
             toggle(onOff(on), on) { vm.setLiveLeftRightRewinds(!on) }
