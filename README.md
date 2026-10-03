@@ -28,6 +28,14 @@
   </a>
 </p>
 
+> ### 🍴 Friendly fork
+> This repository (`saltimbanco/OwnTV`) is a **friendly fork** of
+> [ahXN00/OwnTV](https://github.com/ahXN00/OwnTV) — thank you to the original
+> developer(s) for building and sharing OwnTV.
+> The **Downloader** (by AFTVnews) app code for the latest release of **this fork**
+> is **`8907874`**. Grab the fork's APKs from this repo's
+> [**Releases**](https://github.com/saltimbanco/OwnTV/releases/latest).
+
 ---
 OwnTV is a native **Android TV** IPTV **player**, built with Kotlin and Jetpack Compose for TV. It
 runs **two playback engines** — libmpv (FFmpeg) for the widest compatibility, ExoPlayer (Media3) for
