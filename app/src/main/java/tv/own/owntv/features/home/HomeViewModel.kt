@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -170,12 +171,13 @@ class HomeViewModel(
             if (pid < 0) flowOf(null)
             else historyDao.observeMostRecent(pid).map { h -> h?.let { resolveContinue(pid, it) } }
         }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private suspend fun resolveContinue(
         pid: Long,
         h: tv.own.owntv.core.database.entity.WatchHistoryEntity,
-    ): ContinueTarget? = when (h.mediaType) {
+    ): ContinueTarget? = withContext(Dispatchers.IO) { when (h.mediaType) {
         MediaType.MOVIE -> movieDao.getById(h.itemId)?.let { m ->
             if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, m.categoryId, profileDao, categoryDao)) return@let null
             val pos = progressDao.get(pid, MediaType.MOVIE, m.id)?.positionMs ?: 0L
@@ -193,7 +195,7 @@ class HomeViewModel(
             ContinueTarget(ContinueKind.LIVE, c.name, ContinueAction.LAST_CHANNEL, channelId = c.id)
         }
         else -> null
-    }
+    } }
 
     private val _heroFocused = MutableStateFlow(false)
     private val _previewEnabled = MutableStateFlow(true)

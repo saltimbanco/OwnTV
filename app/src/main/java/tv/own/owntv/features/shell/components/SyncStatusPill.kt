@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -122,7 +123,9 @@ fun SyncStatusPill(modifier: Modifier = Modifier) {
 
     // Catalog syncs first (they're the slower, more interesting ones), then guides, in a stable
     // order so a row doesn't jump around as progress updates arrive.
-    val rows = buildList<SyncLine> {
+    // Memoized: sorting runs only when inputs change, not on every progress tick.
+    val rows = remember(activeRecordings, activeDownload, activeCatalog, activeTrending, activeEpg) {
+        buildList<SyncLine> {
         // Recordings first, always (D13). They are time-critical and unrecoverable — a sync that is
         // collapsed into "+N more" can be watched again in a minute, a programme that is being
         // recorded cannot. Then downloads, which are deliberately started and time-limited. Then the
@@ -135,6 +138,7 @@ fun SyncStatusPill(modifier: Modifier = Modifier) {
             add(SyncLine.TrendingDetail(it))
         }
         activeEpg.values.sortedBy { it.sourceId }.forEach { add(SyncLine.Epg(it)) }
+        }
     }
     val shown = rows.take(MAX_ROWS)
     val hidden = rows.size - shown.size
@@ -386,8 +390,13 @@ private fun trendingCompletedDetailLine(completed: TrendingActivityTracker.Compl
 private const val MAX_ROWS = 4
 
 /** Megabytes to one decimal, formatted for the locale. */
-private fun recordingSizeMb(bytes: Long): String =
+private val sizeFormat: ThreadLocal<java.text.NumberFormat> = ThreadLocal.withInitial {
     java.text.NumberFormat.getNumberInstance().apply {
         minimumFractionDigits = 1
         maximumFractionDigits = 1
-    }.format(bytes / 1_048_576.0)
+    }
+}
+
+/** Megabytes to one decimal, formatted for the locale. */
+private fun recordingSizeMb(bytes: Long): String =
+    (sizeFormat.get() ?: java.text.NumberFormat.getNumberInstance()).format(bytes / 1_048_576.0)

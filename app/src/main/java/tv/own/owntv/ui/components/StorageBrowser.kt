@@ -182,14 +182,14 @@ private fun StorageBrowserContent(
                             }
                         }
                     }
-                    itemsIndexed(roots) { i, root ->
+                    itemsIndexed(roots, key = { _, root -> root.file.absolutePath }) { i, root ->
                         val m = if (i == 0 && hasAccess) Modifier.focusRequester(firstFocus) else Modifier
                         BrowserRow(OwnTVIcon.DOWNLOADS, root.displayLabel(), m) { current = root.file }
                     }
                 } else {
                     item { BrowserRow(OwnTVIcon.BACK, stringResource(R.string.setup_from_current_folder), Modifier.focusRequester(firstFocus)) { current = dir.parentFile } }
-                    itemsIndexed(folders) { _, f -> BrowserRow(OwnTVIcon.DOWNLOADS, f.name) { current = f } }
-                    itemsIndexed(files) { _, f -> BrowserRow(OwnTVIcon.PLAYLIST, f.name) { onPick(f) } }
+                    itemsIndexed(folders, key = { _, f -> f.absolutePath }) { _, f -> BrowserRow(OwnTVIcon.DOWNLOADS, f.name) { current = f } }
+                    itemsIndexed(files, key = { _, f -> f.absolutePath }) { _, f -> BrowserRow(OwnTVIcon.PLAYLIST, f.name) { onPick(f) } }
                 }
             }
 

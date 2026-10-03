@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -497,6 +498,7 @@ class EpgViewModel(
             .flatMapLatest { ids ->
                 if (ids.isEmpty()) flowOf(0) else combine(ids.map { epgDao.countForSource(it) }) { it.sum() }
             }
+            .flowOn(Dispatchers.IO)
             .debounce(GUIDE_DATA_SETTLE_MS)
             .drop(1)
             .onEach { load() }

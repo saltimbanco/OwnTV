@@ -496,13 +496,15 @@ internal fun InfoRow(label: String, value: String) {
     // Kept temporarily for source compatibility while the service overview owns these values.
 }
 
+private val DURATION_HMS = Regex("^(\\d{1,2}):(\\d{2}):(\\d{2})\$")
+
 @Composable
 private fun openSubtitlesResetLabel(raw: String?): String {
     val now = System.currentTimeMillis()
     val target = raw?.trim()?.takeIf { it.isNotEmpty() }?.let { value ->
         value.toLongOrNull()?.let { epoch -> if (epoch < 10_000_000_000L) epoch * 1_000L else epoch }
             ?: runCatching { java.time.Instant.parse(value).toEpochMilli() }.getOrNull()
-            ?: Regex("^(\\d{1,2}):(\\d{2}):(\\d{2})$").matchEntire(value)?.let { match ->
+            ?: DURATION_HMS.matchEntire(value)?.let { match ->
                 now + (match.groupValues[1].toLong() * 3_600L +
                     match.groupValues[2].toLong() * 60L + match.groupValues[3].toLong()) * 1_000L
             }

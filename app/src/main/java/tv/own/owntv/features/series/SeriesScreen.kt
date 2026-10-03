@@ -1380,14 +1380,19 @@ private fun EpisodeView(
 
     // Season rail and episode list are ordered independently (the "Sorting" popup). Both branches
     // sort explicitly rather than leaning on upstream order, so the two orders are symmetrical.
-    val seasons = episodes.map { it.seasonNumber }.distinct()
-        .let { if (seriesOrder.seasonsDescending) it.sortedDescending() else it.sorted() }
+    // Memoized: map/filter/sort runs only when inputs change, not on every recomposition.
+    val seasons = remember(episodes, seriesOrder.seasonsDescending) {
+        episodes.map { it.seasonNumber }.distinct()
+            .let { if (seriesOrder.seasonsDescending) it.sortedDescending() else it.sorted() }
+    }
     val activeSeason = if (seasons.contains(selectedSeason)) selectedSeason else seasons.firstOrNull() ?: 1
-    val seasonEpisodes = episodes.filter { it.seasonNumber == activeSeason }
-        .let { list ->
-            if (seriesOrder.episodesDescending) list.sortedByDescending { ep -> ep.episodeNumber }
-            else list.sortedBy { ep -> ep.episodeNumber }
-        }
+    val seasonEpisodes = remember(episodes, activeSeason, seriesOrder.episodesDescending) {
+        episodes.filter { it.seasonNumber == activeSeason }
+            .let { list ->
+                if (seriesOrder.episodesDescending) list.sortedByDescending { ep -> ep.episodeNumber }
+                else list.sortedBy { ep -> ep.episodeNumber }
+            }
+    }
     // "Hide watched" filter — drops episodes watched to ≥95%. Focus-index math below uses this list so a
     // filtered-out last-watched episode falls back to the first visible one instead of losing focus.
     val visibleEpisodes = remember(seasonEpisodes, hideWatched, completedIds) {

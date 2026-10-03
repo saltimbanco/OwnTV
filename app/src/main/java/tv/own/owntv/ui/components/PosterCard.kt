@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,7 +75,15 @@ fun PosterCard(
                     .background(colors.surfaceContainerLowest),
             ) {
                 if (!posterUrl.isNullOrBlank()) {
-                    AsyncImage(model = posterUrl, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    val context = LocalContext.current
+                    val request = remember(posterUrl) {
+                        coil3.request.ImageRequest.Builder(context)
+                            .data(posterUrl)
+                            .size(coil3.size.Size(342, 513))
+                            .memoryCacheKey(posterUrl)
+                            .build()
+                    }
+                    AsyncImage(model = request, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         OwnTVIcon(OwnTVIcon.MOVIES, tint = colors.onSurfaceVariant, modifier = Modifier.size(36.dp))
