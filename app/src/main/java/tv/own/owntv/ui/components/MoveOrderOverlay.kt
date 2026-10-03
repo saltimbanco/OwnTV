@@ -113,7 +113,7 @@ fun MoveOrderOverlay(
                 modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                itemsIndexed(itemNames) { idx, name ->
+                itemsIndexed(itemNames, key = { _, name -> name }) { idx, name ->
                     val isActive = idx == activeIndex
                     Box(
                         modifier = Modifier

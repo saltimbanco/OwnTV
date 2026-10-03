@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tv.own.owntv.core.epg.EpgSourceStore
 import tv.own.owntv.core.nav.MainSection
 import tv.own.owntv.core.nav.NavVisibility
@@ -119,8 +121,9 @@ class ShellViewModel(
             lastResumeCheckAtElapsed = now
         }
         viewModelScope.launch {
+            withContext(Dispatchers.IO) {
             val nowMs = System.currentTimeMillis()
-            val pid = currentProfileId() ?: return@launch
+            val pid = currentProfileId() ?: return@withContext
             // --- Playlist sources ---
             val playlistModes = settings.playlistAutoRefresh.first()
             if (playlistModes.isNotEmpty()) {
@@ -159,6 +162,7 @@ class ShellViewModel(
                 }
             }
             if (includeStartup) refillGuideEmptiedByMigration()
+            }
         }
     }
 
@@ -229,39 +233,39 @@ class ShellViewModel(
     }
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
-        .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.DARK)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.DARK)
 
     val uiZoomPercent: StateFlow<Int> = settings.uiZoomPercent
-        .stateIn(viewModelScope, SharingStarted.Eagerly, UiZoom.DEFAULT)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiZoom.DEFAULT)
 
     val fontCustomization: StateFlow<FontCustomization> = settings.fontCustomization
-        .stateIn(viewModelScope, SharingStarted.Eagerly, FontCustomization())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FontCustomization())
 
     val animationLevel: StateFlow<tv.own.owntv.core.theme.AnimationLevel> = settings.animationLevel
-        .stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.core.theme.AnimationLevel.FULL)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.theme.AnimationLevel.FULL)
 
     val accent: StateFlow<AccentColor> = settings.accent
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AccentColor.TEAL)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AccentColor.TEAL)
 
     /** Custom accent hex ("#52DBC8"); blank = the preset above is in effect. */
     val customAccent: StateFlow<String> = settings.customAccent
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     /** Focus ring color hex (#121); blank = follow the accent. */
     val focusHighlight: StateFlow<String> = settings.focusHighlight
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     /** Focus ring width in dp (#121). */
     val focusHighlightWidth: StateFlow<Int> = settings.focusHighlightWidth
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 2)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 2)
 
     /** Glass effect background image path (app-private); blank = no background (panels solid). */
     val bgImagePath: StateFlow<String> = settings.bgImagePath
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     /** Resolved glass config (which surfaces + alpha). Empty scope = feature off. */
     val glassConfig: StateFlow<tv.own.owntv.core.theme.GlassConfig> = settings.glassConfig
-        .stateIn(viewModelScope, SharingStarted.Eagerly, tv.own.owntv.core.theme.GlassConfig())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.theme.GlassConfig())
 
     /** The active profile's avatar (so the sidebar reflects profile edits, not a separate setting). */
     val avatarId: StateFlow<Int> = settings.activeProfileId

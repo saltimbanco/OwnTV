@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onEach
@@ -375,6 +376,7 @@ class LiveViewModel(
         .debounce(350)
         .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
         .mapLatest { (ch, _) -> ch?.id to ch?.let { epgReader.nowNext(it, custom.value, epgOffset.value) } }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null to null)
 
     val nowNext: StateFlow<EpgNowNext?> = keyedNowNext.map { it.second }
@@ -406,6 +408,7 @@ class LiveViewModel(
             if (ch == null || minute == null) null
             else epgReader.nowNextAt(ch, minute * 60_000L, custom.value, epgOffset.value)
         }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
@@ -419,6 +422,7 @@ class LiveViewModel(
             .mapLatest { (ch, _) ->
                 ch?.let { catchupProgrammes(it).map { p -> LiveProgramme(p.startMs, p.stopMs, p.title) } }.orEmpty()
             }
+            .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
@@ -431,7 +435,7 @@ class LiveViewModel(
         .mapLatest { ch ->
             val id = ch?.categoryId ?: return@mapLatest null
             delay(150) // a quick scroll cancels this before the lookup runs
-            categoryDao.getById(id)?.name
+            withContext(Dispatchers.IO) { categoryDao.getById(id)?.name }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /** This profile's hide/rename/reorder customizations for Live TV. */

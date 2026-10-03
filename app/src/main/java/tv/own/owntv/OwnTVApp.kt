@@ -35,6 +35,14 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
 
         /** Lower bound: below this the cache thrashes and stops saving any downloads. */
         private const val MIN_IMAGE_CACHE_BYTES = 32L * 1024 * 1024
+
+        /** In-memory locale tag so attachBaseContext + config changes don't re-read prefs. */
+        @Volatile private var cachedLocaleTag: String? = null
+
+        fun resolveLocaleTag(base: Context): String {
+            cachedLocaleTag?.let { return it }
+            return tv.own.owntv.core.i18n.LocaleStore.from(base).readBlocking().also { cachedLocaleTag = it }
+        }
     }
 
     /** Application-lifetime scope for small fire-and-forget IO that must not touch the launch path. */
@@ -59,7 +67,7 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
      * every Locale.getDefault() reader still depend on it.
      */
     override fun attachBaseContext(base: Context) {
-        val tag = tv.own.owntv.core.i18n.LocaleStore.from(base).readBlocking()
+        val tag = resolveLocaleTag(base)
         tv.own.owntv.core.i18n.AppLocale.applyGlobally(tag)
         super.attachBaseContext(tv.own.owntv.core.i18n.AppLocale.wrap(base, tag))
     }
@@ -71,7 +79,7 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
      */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        val tag = tv.own.owntv.core.i18n.LocaleStore.from(this).readBlocking()
+        val tag = cachedLocaleTag ?: resolveLocaleTag(this)
         tv.own.owntv.core.i18n.AppLocale.applyGlobally(tag)
     }
 

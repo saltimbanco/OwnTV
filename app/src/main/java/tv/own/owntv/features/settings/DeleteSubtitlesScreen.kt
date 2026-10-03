@@ -188,13 +188,15 @@ internal data class EpisodeDisplayTitleParts(
  * display suffix in [contentTitle]; current rows persist only the raw series title. Strip the old
  * suffix only when its numbers exactly match [contentKey], then let Compose format it for the locale.
  */
+private val EPISODE_SUFFIX = Regex(":S(\\d+)E(\\d+)$")
+
 internal fun episodeDisplayTitleParts(
     mediaType: String,
     contentTitle: String,
     contentKey: String,
 ): EpisodeDisplayTitleParts? {
     if (mediaType != "SERIES") return null
-    val match = Regex(":S(\\d+)E(\\d+)$").find(contentKey) ?: return null
+    val match = EPISODE_SUFFIX.find(contentKey) ?: return null
     val season = match.groupValues[1].toInt()
     val episode = match.groupValues[2].toInt()
     val legacySuffix = " · S${season}E${episode}"

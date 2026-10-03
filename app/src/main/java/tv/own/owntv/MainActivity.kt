@@ -74,7 +74,7 @@ open class MainActivity : ComponentActivity() {
         private const val TAG = "OwnTVHome"
 
         /** Bounded wait for the startup database probe (see [probeDatabase]). */
-        private const val DB_PROBE_TIMEOUT_MS = 5_000L
+        private const val DB_PROBE_TIMEOUT_MS = 800L
 
         /**
          * Hard ceiling on the ST3 splash. A stuck DataStore/profile read must never leave the user
@@ -114,7 +114,7 @@ open class MainActivity : ComponentActivity() {
      * (see docs/internationalization.md 0b, "Both Application and Activity must wrap").
      */
     override fun attachBaseContext(newBase: android.content.Context) {
-        val tag = tv.own.owntv.core.i18n.LocaleStore.from(newBase).readBlocking()
+        val tag = OwnTVApp.resolveLocaleTag(newBase)
         super.attachBaseContext(tv.own.owntv.core.i18n.AppLocale.wrap(newBase, tag))
     }
 
@@ -343,20 +343,27 @@ open class MainActivity : ComponentActivity() {
                 // Otherwise this stays null and panels fall back to Tier-1 translucency.
                 val needsBackdropAssets = glassActive && bgImagePath.isNotBlank()
                 val supportsFrostPyramid = supportsBackdropBlur()
+                // Quantize size: 1px layout churn must not re-decode + re-blur the backdrop.
+                val backdropSize = remember(rootSizePx) {
+                    Size(
+                        (rootSizePx.width / 64f).toInt() * 64f,
+                        (rootSizePx.height / 64f).toInt() * 64f,
+                    )
+                }
                 val blurred by produceState<BlurredBackdrop?>(
                     initialValue = null,
                     bgImagePath,
                     needsBackdropAssets,
                     supportsFrostPyramid,
-                    rootSizePx,
+                    backdropSize,
                 ) {
-                    if (!needsBackdropAssets || rootSizePx.width <= 0f || rootSizePx.height <= 0f) {
+                    if (!needsBackdropAssets || backdropSize.width <= 0f || backdropSize.height <= 0f) {
                         value = null
                         return@produceState
                     }
                     // Decode + blur on a background dispatcher; never block the main thread.
                     val path = bgImagePath
-                    value = produceBlurredBackdrop(path, rootSizePx, supportsFrostPyramid)
+                    value = produceBlurredBackdrop(path, backdropSize, supportsFrostPyramid)
                 }
                 CompositionLocalProvider(
                     LocalDensity provides Density(

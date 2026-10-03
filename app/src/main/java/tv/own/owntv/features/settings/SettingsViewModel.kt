@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
@@ -222,6 +223,7 @@ class SettingsViewModel(
             }
             out
         }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private suspend fun fetchExpiry(s: SourceEntity): String? = runCatching {
@@ -659,11 +661,11 @@ class SettingsViewModel(
             customizations.hiddenCategories,
             isKids,
         )
-        return channelDao.searchList(query.trim(), sourceIds, 500)
+        return channelDao.searchList(query.trim(), sourceIds, 100)
             .asSequence()
             .filter { tv.own.owntv.core.customize.CustomizeKeys.channel(it) !in customizations.hiddenItems }
             .filter { it.categoryId == null || it.categoryId !in hiddenCategoryIds }
-            .take(300)
+            .take(50)
             .toList()
     }
 

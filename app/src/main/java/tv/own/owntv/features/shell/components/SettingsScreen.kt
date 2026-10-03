@@ -2381,7 +2381,7 @@ internal fun PlaybackErrorLogDialog(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(list) { e ->
+                    items(list, key = { it.atMs to it.kind }) { e ->
                         FocusableSurface(
                             onClick = {},
                             modifier = Modifier.fillMaxWidth(),

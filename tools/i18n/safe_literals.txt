@@ -130,7 +130,7 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveZapList.kt	LiveZapList
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveZapList.kt	direct tune: zap rebuild failed
 2	empty	app/src/main/java/tv/own/owntv/features/live/ServerFailover.kt	\0
-2	regex	app/src/main/java/tv/own/owntv/features/live/ServerFailover.kt	[^\\p{L}\\p{N}]+
+1	regex	app/src/main/java/tv/own/owntv/features/live/ServerFailover.kt	[^\\p{L}\\p{N}]+
 1	regex	app/src/main/java/tv/own/owntv/features/live/ServerFailover.kt	\\s+
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/ServerFailover.kt	hop_enabled
 1	preference-key	app/src/main/java/tv/own/owntv/features/live/ServerFailover.kt	owntv_server_failover

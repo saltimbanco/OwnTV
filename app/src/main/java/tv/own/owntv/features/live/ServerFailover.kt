@@ -48,14 +48,17 @@ object FailoverPrefs {
 /** Minimum [matchScore] for a cross-server candidate to be considered the same channel. */
 const val FAILOVER_MIN_SCORE = 0.45
 
+private val NON_ALNUM = Regex("[^\\p{L}\\p{N}]+")
+private val WHITESPACE = Regex("\\s+")
+
 /** Compact identity key: lowercased, letters/digits only (`"NOVA Sports-Prime"` → `"novasportsprime"`). */
 fun normalizeChannelKey(name: String): String =
-    name.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), "")
+    name.lowercase(java.util.Locale.ROOT).replace(NON_ALNUM, "")
 
 /** Significant search tokens of a channel name (`"Nova Sports Prime HD"` → `{nova, sports, prime, hd}`). */
 fun channelTokens(name: String): Set<String> =
-    name.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ")
-        .trim().split(Regex("\\s+")).filter { it.isNotBlank() }.toSet()
+    name.lowercase(java.util.Locale.ROOT).replace(NON_ALNUM, " ")
+        .trim().split(WHITESPACE).filter { it.isNotBlank() }.toSet()
 
 /**
  * How likely [candidateName] is the same channel as [targetName]: 1.0 for an exact (modulo
