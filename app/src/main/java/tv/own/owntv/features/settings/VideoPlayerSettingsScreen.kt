@@ -446,6 +446,16 @@ internal fun videoQuickBinding(key: String, vm: SettingsViewModel): VideoQuickBi
             val on by vm.detailedDiagnostics.collectAsStateWithLifecycle()
             toggle(onOff(on), on) { vm.setDetailedDiagnostics(!on) }
         }
+        "vp_server_hop" -> {
+            val ctx = LocalContext.current
+            val on = FailoverPrefs.isEnabled(ctx)
+            toggle(onOff(on), on) { FailoverPrefs.setEnabled(ctx, !FailoverPrefs.isEnabled(ctx)) }
+        }
+        "vp_server_hop_retries" -> {
+            val ctx = LocalContext.current
+            val retries = FailoverPrefs.getRetries(ctx)
+            link(retries.toString(), retries != FailoverPrefs.DEFAULT_RETRIES)
+        }
         // vp_mini has no value of its own — the mini player row is a screen, nothing else.
         else -> null
     }

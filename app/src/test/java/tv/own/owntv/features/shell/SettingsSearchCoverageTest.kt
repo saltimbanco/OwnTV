@@ -144,6 +144,7 @@ class SettingsSearchCoverageTest {
         "player_subtitles_connected_user", "player_subtitles_delete_action", "player_subtitles_sign_in",
         "player_subtitles_sign_out", "settings_open_subtitles_advanced", "settings_open_subtitles_setup_local",
         "settings_open_subtitles_setup_remote",
+        "settings_sources_import_file", "settings_bulk_import_parse_error",
     )
 
     @Test
