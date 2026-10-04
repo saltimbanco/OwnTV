@@ -1775,6 +1775,31 @@ fun OwnTVShell(
                 LaunchedEffect(liveVm) {
                     liveVm.catchupUnavailable.collect { localSubToast.show(catchupUnavailable) }
                 }
+                // Cross-playlist failover: name each playlist switch in the popup while hopping to the
+                // same channel elsewhere, and say so when nothing else plays it. Tells the fullscreen
+                // view model when live is actually on screen, so only it can start a hop.
+                val failoverResources = androidx.compose.ui.platform.LocalContext.current.resources
+                LaunchedEffect(isFull, zapSource) {
+                    liveVm.setFullscreenLive(isFull && zapSource == MainSection.LIVE_TV)
+                }
+                LaunchedEffect(liveVm) {
+                    liveVm.failoverNotice.collect { n ->
+                        localSubToast.show(
+                            failoverResources.getString(
+                                R.string.failover_switching,
+                                n.channelName,
+                                n.toPlaylist ?: n.fromPlaylist.orEmpty(),
+                                n.attempt,
+                                n.total,
+                            ),
+                        )
+                    }
+                }
+                LaunchedEffect(liveVm) {
+                    liveVm.failoverExhausted.collect { e ->
+                        localSubToast.show(failoverResources.getString(R.string.failover_exhausted, e.channelName))
+                    }
+                }
                 // N4 — back on a channel whose saved copy was kept: continue from there, or stay live.
                 val timeshiftResumeAt by liveVm.timeshiftResumeAt.collectAsStateWithLifecycle()
                 if (isFull && timeshiftResumeAt != null) {
