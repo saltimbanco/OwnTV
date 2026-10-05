@@ -84,8 +84,8 @@ fun failoverScore(aNorm: String, bNorm: String): Double {
  * Same-playlist siblings come first (another entry for the channel, if it exists), then other
  * playlists in profile order ([sourceOrder]). Within each band, best fuzzy match first. Entries
  * below [FAILOVER_MIN_SCORE] are dropped, as is the interrupted stream itself (same id or same
- * URL — retrying the identical URL is the engine's own retry, not a hop). A shared non-blank
- * EPG id outranks everything: it is the provider's own statement of identity.
+ * URL — retrying the identical URL is the engine's own retry, not a hop). Matching is purely
+ * name-based: provider ids are not comparable across playlists.
  */
 fun rankFailoverCandidates(
     original: ChannelEntity,
@@ -101,10 +101,7 @@ fun rankFailoverCandidates(
         .filter { it.id != original.id && it.streamUrl != original.streamUrl }
         .distinctBy { it.id }
         .map { ch ->
-            val sameEpg = !original.epgChannelId.isNullOrBlank() &&
-                original.epgChannelId.equals(ch.epgChannelId, ignoreCase = true)
-            val score = if (sameEpg) 1.0 else failoverScore(originalNorm, normalizeChannelName(ch.name))
-            RankedFailoverCandidate(ch, score)
+            RankedFailoverCandidate(ch, failoverScore(originalNorm, normalizeChannelName(ch.name)))
         }
         .filter { it.score >= minScore }
         .sortedWith(
