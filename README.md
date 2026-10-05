@@ -199,9 +199,8 @@ https://github.com/ahXN00/OwnTV/releases/latest/download/OwnTV.apk
 - **Android TV / Google TV** — Downloader is on Google Play too, so the same code works. Or sideload
   with *Send files to TV*, a USB drive, or `adb install OwnTV.apk`.
 
-> Install only from this repository's Releases. Each release ships **two APKs**:
-> `OwnTV.apk` (arm — every real TV box, and what the Downloader code fetches) and
-> `OwnTV-x86_64-vX.X.X.apk` (emulators and rare Intel boxes).
+> Install only from this repository's Releases. Each release ships a single arm APK
+> (`OwnTV.apk` — every real TV box, and what the Downloader code fetches). There is no x86 build.
 
 ## 🛠️ Building & running
 
@@ -213,9 +212,8 @@ Gradle downloads it from OwnTV's public Maven repository by itself — **no acco
 
 1. **Get the code** — `git clone https://github.com/ahXN00/OwnTV.git` (or download the ZIP).
 2. **Open it** in [Android Studio](https://developer.android.com/studio) and let Gradle sync.
-3. **Pick the build variant** — `standard` for real devices and arm emulators, `x86_64` for x86_64
-   emulators. This matters: the native player only loads on a matching ABI.
-4. **Run** ▶. Minimum **Android 8.0 / API 26**.
+3. **Run** ▶ on a real device or an arm emulator (the native player only loads on a matching
+   ABI — there is no x86 build). Minimum **Android 8.0 / API 26**.
 
 Command line: `./gradlew assembleDebug` (`gradlew.bat` on Windows). The APK lands in
 `app/build/outputs/apk/`.

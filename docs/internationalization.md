@@ -1535,7 +1535,7 @@ split status storage, or richer reporting remain informational unless product po
 changed. Do not recreate a 100% community-language gate. A semantic English wording change gets a new
 resource key so an old translation cannot silently override a new meaning.
 
-**4e. APK delta.** Build `standardRelease` before and after the Phase 4a flag flip, record the actual APK and
+**4e. APK delta.** Build `release` before and after the Phase 4a flag flip, record the actual APK and
 `resources.arsc` delta in [`docs/i18n-apk-size-baseline.md`](./i18n-apk-size-baseline.md), and keep
 `localeFilters` as the one-line rollback lever.
 
@@ -1559,10 +1559,10 @@ These are covered by JVM/i18n regression tests and Android-test compilation/inst
 Build and static checks (commands to run, not run automatically):
 
 ```bash
-./gradlew :app:assembleStandardDebug
+./gradlew :app:assembleDebug
 python3 tools/i18n/validate_strings.py --report text  # structural checks + informational coverage
 python3 tools/i18n/check_hardcoded_strings.py  # literal baseline, may only shrink
-./gradlew :app:lintStandardDebug               # MissingTranslation remains informational
+./gradlew :app:lintDebug               # MissingTranslation remains informational
 ```
 
 End-to-end on a real device or TV emulator, per the reproduce-before-you-believe rule.

@@ -57,6 +57,10 @@ android {
         // than any published release and the in-app updater never offers an "update" while developing.
         versionName = System.getenv("VERSION_NAME") ?: "99.99.99"
 
+        // Arm only (arm64-v8a + armeabi-v7a) — the only APK this repo produces. Set here rather than
+        // in a flavor (there are none left) so dependency .so files never sneak other ABIs back in.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+
         // Opt-in local diagnostic APKs keep the rolling playback trace enabled even when they are
         // release-signed (so they can update an installed production build without changing its data).
         buildConfigField(
@@ -93,26 +97,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // ABI split via product flavors: real Android TV / Fire TV hardware is arm (arm64-v8a covers
+    // Single ABI set: real Android TV / Fire TV hardware is arm (arm64-v8a covers
     // everything modern; armeabi-v7a keeps the original 32-bit Nvidia Shield TV 2015/2017, which runs
-    // Android 9+ but is 32-bit). x86_64 is emulator-only — no real TV box uses it. Shipping them as
-    // separate flavors halves the download users get via the Downloader code (~49MB vs the old 104MB
-    // universal APK that bundled all 4 ABIs), which fixes the "parse error on install" reports caused
-    // by truncated downloads. x86 (32-bit Intel) is dropped entirely — even emulators use x86_64.
+    // Android 9+ but is 32-bit). There is deliberately no x86_64 flavor: no real TV box uses it, and
+    // shipping one universal APK (~104MB bundling all ABIs) caused the "parse error on install"
+    // reports from truncated downloads. So one arm APK is the only artifact, half the download.
     //
-    // Local dev: pick a flavor in Android Studio's "Build Variants" panel before Run (standard for
-    // real devices / arm emulators, x86_64 for an x86_64 emulator). `assembleRelease` builds BOTH.
-    flavorDimensions += "abi"
-    productFlavors {
-        create("standard") {
-            dimension = "abi"
-            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
-        }
-        create("x86_64") {
-            dimension = "abi"
-            ndk { abiFilters += listOf("x86_64") }
-        }
-    }
+    // Local dev: Run in Android Studio installs straight onto the device (standard for
+    // real devices / arm emulators). `assembleRelease` builds the shippable arm APK.
 
     // Release signing: env vars first (that is how CI injects the GitHub secrets), then Gradle
     // properties as a local fallback. Put the local ones in the USER-WIDE file — never in the repo:
@@ -123,7 +115,7 @@ android {
     //     owntv.keyAlias=...
     //     owntv.keyPassword=...
     //
-    // With those set, `./gradlew :app:assembleStandardRelease` produces a release-signed APK in any
+    // With those set, `./gradlew :app:assembleRelease` produces a release-signed APK in any
     // terminal with no env-var dance, so a local dev build installs straight over a published
     // release (`adb install -r`) and upgrade/migration testing works with real data.
     // When neither source is configured — fork CI, or a fresh clone — nothing here applies and
@@ -244,11 +236,10 @@ androidComponents {
     }
 }
 
-// The profile is a list of code paths, not machine code, so one recording serves every ABI flavor.
-// mergeIntoMain writes it to `src/main/generated/baselineProfiles/` instead of the recording flavor's
-// own source set — required here because it has to be recorded on an x86_64 emulator (baseline
-// profile collection needs API 33+, and the arm TV boxes this app targets are older) yet shipped in
-// the `standard` arm APK.
+// The profile is a list of code paths, not machine code, so the checked-in recording serves the
+// arm APK as-is. mergeIntoMain writes it to `src/main/generated/baselineProfiles/`. Re-recording
+// needs an API 33+ arm64 device or emulator (collection needs API 33+, and the arm TV boxes this
+// app targets are older) — there is no x86_64 APK to run on an x86_64 emulator anymore.
 baselineProfile {
     mergeIntoMain = true
 }
@@ -387,9 +378,8 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
 
     // The recorded startup journey (audit ST1). Regenerate with
-    // `./gradlew :app:generateBaselineProfile` whenever the startup path changes. `mergeIntoMain`
-    // collapses the per-variant tasks into that single one; it records against :app's x86_64 flavor
-    // (see baselineprofile/build.gradle.kts) because collection needs an API 33+ device.
+    // `./gradlew :app:generateBaselineProfile` whenever the startup path changes, on an API 33+ arm64
+    // device or emulator. `mergeIntoMain` collapses the per-variant tasks into that single one.
     baselineProfile(project(":baselineprofile"))
 
     // Database (Room, via KSP) + Paging

@@ -36,11 +36,11 @@ the locale-filtered string table only.
 | `resources.arsc` stored (compressed) | 40,008 bytes, stored uncompressed |
 | Packaged locale configs | `en`, `en-rGB` (verified via `aapt2 dump configurations` + `check_pseudo_locales.py --mode release`) |
 | Pseudolocales in release | none (verified) |
-| Build | `assembleStandardRelease`, arm64-v8a + armeabi-v7a ABI split, R8 optimization on |
+| Build | `assembleRelease`, arm64-v8a + armeabi-v7a ABI split, R8 optimization on |
 
 ## Phase 4e comparison template
 
-Build `standardRelease` before and after the Phase 4a catalogue flip, then append the measured result here:
+Build `release` before and after the Phase 4a catalogue flip, then append the measured result here:
 
 | Phase | Locales packaged | APK size | `resources.arsc` | Δ APK | Δ arsc |
 |---|---|---|---|---|---|
