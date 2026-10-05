@@ -512,7 +512,7 @@ python3 tools/i18n/seed_translations.py prepare-glossary --locales de,ar,ja,tr -
 python3 tools/i18n/seed_text.py check --locales hi
 python3 tools/i18n/seed_text.py check --locales bn
 python3 tools/i18n/seed_text.py check --locales de,ar,ja,tr
-./gradlew :app:processStandardDebugResources --console=plain
+./gradlew :app:processDebugResources --console=plain
 ```
 
 The real submission commands are printed from the prepared manifest for the maintainer. The agent does
@@ -608,5 +608,5 @@ exists.
 
 ### 4e — APK delta
 
-Build `standardRelease` before and after the Phase 4a catalogue flip, record the actual APK and `resources.arsc` delta,
+Build `release` before and after the Phase 4a catalogue flip, record the actual APK and `resources.arsc` delta,
 and retain `localeFilters` as the rollback lever.

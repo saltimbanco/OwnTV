@@ -109,17 +109,16 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      # One variant, not `test`/`lint` across every flavor: standard+debug is the variant the JVM
-      # tests are written against, and the ABI flavors differ only in the packaged native libs.
+      # Debug is the variant the JVM tests are written against; the single arm APK has no flavors.
       - name: Unit tests
         run: |
           chmod +x ./gradlew
-          ./gradlew testStandardDebugUnitTest --stacktrace
+          ./gradlew testDebugUnitTest --stacktrace
 
       # abortOnError = true in app/build.gradle.kts, so this fails the job on a lint error.
       - name: Lint
         if: always()   # report both verdicts in one run instead of one failure at a time
-        run: ./gradlew lintStandardDebug --stacktrace
+        run: ./gradlew lintDebug --stacktrace
 
       - name: Upload test and lint reports
         if: always()   # the reports matter most when the step above failed
@@ -234,23 +233,16 @@ jobs:
         run: |
           chmod +x ./gradlew
           if [ -n "$KEYSTORE_FILE" ]; then
-            echo "Building signed release APKs (both ABI flavors)"
+            echo "Building signed release APK (arm: arm64-v8a + armeabi-v7a)"
             ./gradlew assembleRelease --stacktrace
-            # Product flavors split the output by flavor subfolder:
-            #   standard/release  -> arm (arm64-v8a + armeabi-v7a) — the main download
-            #   x86_64/release    -> x86_64 — emulator / rare x86 box
-            ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
-            X86_SRC=$(ls app/build/outputs/apk/x86_64/release/*.apk | head -n1)
-            echo "Built arm:    $ARM_SRC"
-            echo "Built x86_64: $X86_SRC"
+            # No flavors: the single arm APK lands directly under release/.
+            ARM_SRC=$(ls app/build/outputs/apk/release/*.apk | head -n1)
+            echo "Built arm: $ARM_SRC"
             echo "ARM_SRC=$ARM_SRC" >> "$GITHUB_ENV"
-            echo "X86_SRC=$X86_SRC" >> "$GITHUB_ENV"
           else
             echo "Building debug APK"
             ./gradlew assembleDebug
-            # Debug also builds both flavors; standard (arm) is the one most likely to be tested on a
-            # real device. Surface it as the primary artifact; x86_64 debug is still in its folder.
-            SRC=$(ls app/build/outputs/apk/standard/debug/*.apk | head -n1)
+            SRC=$(ls app/build/outputs/apk/debug/*.apk | head -n1)
             echo "Built: $SRC"
             echo "ARM_SRC=$SRC" >> "$GITHUB_ENV"
           fi
@@ -271,18 +263,12 @@ jobs:
           # (used by the Fire TV Downloader code and any "always-latest" sideload link).
           if [ "$IS_TAG" = "true" ]; then
             cp "$ARM_SRC" "dist/OwnTV.apk"
-            # Separate x86_64 build for emulators / rare Intel boxes. Pinned to the version only —
-            # no always-latest copy, since real devices (the Downloader audience) don't need it.
-            if [ -n "$X86_SRC" ]; then
-              cp "$X86_SRC" "dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
-              echo "Packaged dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
-            fi
           fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          # Upload the whole dist/ so both the arm APK and the x86_64 APK are captured.
+          # Upload the whole dist/ — the versioned arm APK plus its always-latest copy.
           name: ${{ env.APK_OUT }}
           path: dist/*
           if-no-files-found: error
@@ -329,7 +315,6 @@ jobs:
           files: |
             dist/${{ env.APK_OUT }}
             dist/OwnTV.apk
-            dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk
           body_path: dist/RELEASE_NOTES.md
           # Must stay false: it appends GitHub's auto commit/PR list under the body, which buries the
           # short in-app notes the updater dialog shows.
