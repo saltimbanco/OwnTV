@@ -53,11 +53,12 @@ class ChannelFailoverTest {
     }
 
     @Test
-    fun `shared epg id outranks name similarity`() {
-        val original = channel(1, 10, "Some Local Name", url = "http://x/1.ts").copy(epgChannelId = "SkySportsMainEvent")
-        val epgMatch = channel(2, 20, "Totally Different Label", url = "http://x/2.ts").copy(epgChannelId = "skysportsmainevent")
-        val nameMatch = channel(3, 20, "Some Other Local Name HD", url = "http://x/3.ts")
-        val ranked = rankFailoverCandidates(original, listOf(nameMatch, epgMatch), listOf(10, 20))
-        assertEquals(2L, ranked.first().channel.id)
+    fun `better name match ranks first, ids take no part`() {
+        val original = channel(1, 10, "BBC One HD")
+        // Same name, different provider ids — still the top match on name alone.
+        val exact = channel(2, 20, "BBC ONE")
+        val partial = channel(3, 20, "BBC One Wales HD")
+        val ranked = rankFailoverCandidates(original, listOf(partial, exact), listOf(10, 20))
+        assertEquals(listOf(2L, 3L), ranked.map { it.channel.id })
     }
 }

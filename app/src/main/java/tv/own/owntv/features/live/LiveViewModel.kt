@@ -1227,13 +1227,11 @@ class LiveViewModel(
         }
     }
 
-    /** Same remote channel, then fuzzy name matches across the profile's playlists, ranked to hop. */
+    /** Fuzzy name matches across the profile's playlists, ranked to hop. Name-only: provider
+     *  remote ids and EPG ids are not comparable across playlists, so they take no part. */
     private suspend fun findFailoverCandidates(interrupted: ChannelEntity): List<RankedFailoverCandidate> {
         val ids = ctx.value.sourceIds.ifEmpty { return emptyList() }
         val pool = mutableSetOf<ChannelEntity>()
-        interrupted.remoteId?.let { rid ->
-            runCatching { channelDao.findByRemoteIds(ids, listOf(rid)) }.getOrNull()?.let { pool += it }
-        }
         failoverTokens(normalizeChannelName(interrupted.name)).take(4).forEach { token ->
             runCatching { channelDao.searchList(token, ids, 50) }.getOrNull()?.let { pool += it }
         }
