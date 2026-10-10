@@ -1496,7 +1496,8 @@ internal fun reminderLeadText(minutes: Int): String =
 internal fun liveEpgShiftLabel(minutes: Int): String {
     if (minutes == 0) return stringResource(R.string.common_off)
     val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0] ?: java.util.Locale.US
-    val number = java.text.NumberFormat.getIntegerInstance(locale)
+    // Remembered per locale: construction is expensive and this labels every shifted EPG row.
+    val number = remember(locale) { java.text.NumberFormat.getIntegerInstance(locale) }
     val sign = if (minutes < 0) "−" else "+"
     val absolute = kotlin.math.abs(minutes)
     val hours = absolute / 60

@@ -641,10 +641,16 @@ internal fun fileSize(bytes: Long): String =
 
 private fun gigabytes(bytes: Long): String = decimal(bytes.coerceAtLeast(0) / 1_073_741_824.0)
 
-private fun decimal(value: Double): String = NumberFormat.getNumberInstance().apply {
-    minimumFractionDigits = 1
-    maximumFractionDigits = 1
-}.format(value)
+/** Locale number formatting without a per-call factory: construction is expensive and instances
+ *  are not thread-safe, so one lives per thread. */
+private val decimalFormat = ThreadLocal.withInitial<java.text.NumberFormat> {
+    NumberFormat.getNumberInstance().apply {
+        minimumFractionDigits = 1
+        maximumFractionDigits = 1
+    }
+}
+
+private fun decimal(value: Double): String = decimalFormat.get().format(value)
 
 /**
  * The volume's own name as Android words it, in the user's language — "USB drive", "Internal shared

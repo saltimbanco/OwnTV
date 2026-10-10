@@ -101,6 +101,9 @@ private fun PinDialogBody(title: String, onSubmit: (String) -> Unit, onDismiss: 
  * [takenNames] are the OTHER profiles' names (lowercased) — profile names must be unique (they're the
  * merge key for backup restore), so a collision blocks Create/Save with an inline error.
  */
+/** Avatar ids including "no avatar" (-1): hoisted so the picker stops allocating per recomposition. */
+private val AVATAR_IDS = (-1 until OwnTVAvatars.COUNT).toList()
+
 @Composable
 internal fun ProfileEditorDialog(
     initial: ProfileEntity?,
@@ -140,7 +143,7 @@ internal fun ProfileEditorDialog(
         tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.profiles_avatar).uppercase(), Modifier.padding(top = 18.mpx))
         val accent = stageAccent.accent
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.mpx), contentPadding = androidx.compose.foundation.layout.PaddingValues(6.mpx)) {
-            items((-1 until OwnTVAvatars.COUNT).toList()) { id -> // Phase 7 — includes "no avatar" (-1)
+            items(AVATAR_IDS, key = { it }) { id -> // Phase 7 — includes "no avatar" (-1)
                 tv.own.owntv.ui.stage.StageSurface(
                     onClick = { avatarId = id },
                     radius = 44.mpx,

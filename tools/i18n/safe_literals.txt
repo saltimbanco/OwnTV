@@ -50,8 +50,10 @@
 2	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	PIN_REMOVE
 3	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	PIN_SET
 2	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	SHOW
+1	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	category
 1	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	confirm
 1	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	first
+1	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	hidden
 1	technical	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	▶
 1	empty	app/src/main/java/tv/own/owntv/features/customize/CustomizeViewModel.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/downloads/DownloadsScreen.kt	\0
@@ -64,6 +66,7 @@
 1	empty	app/src/main/java/tv/own/owntv/features/downloads/DownloadsViewModel.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	$p
+1	technical	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	channel
 2	technical	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	·
 1	technical	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	▲ ▼
 1	technical	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	◀
@@ -85,6 +88,7 @@
 1	technical	app/src/main/java/tv/own/owntv/features/epg/GuideCore.kt	tnum
 1	empty	app/src/main/java/tv/own/owntv/features/epg/GuideStage.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/epg/GuideStage.kt	EEEdMMM
+1	technical	app/src/main/java/tv/own/owntv/features/epg/GuideStage.kt	suggestion
 1	technical	app/src/main/java/tv/own/owntv/features/epg/GuideStage.kt	tnum
 4	technical	app/src/main/java/tv/own/owntv/features/epg/GuideStage.kt	·
 1	technical	app/src/main/java/tv/own/owntv/features/epg/GuideStage.kt	· $nowTitle
