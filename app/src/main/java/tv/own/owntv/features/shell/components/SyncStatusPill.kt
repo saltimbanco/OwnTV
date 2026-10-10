@@ -373,9 +373,14 @@ private fun trendingCompletedDetailLine(completed: TrendingActivityTracker.Compl
 /** Beyond this many concurrent syncs the pill summarises the rest, rather than covering the screen. */
 private const val MAX_ROWS = 4
 
-/** Megabytes to one decimal, formatted for the locale. */
-private fun recordingSizeMb(bytes: Long): String =
+/** Megabytes to one decimal, formatted for the locale. The formatter is thread-local: construction
+ *  is expensive and instances are not thread-safe, so sharing one (or rebuilding per call) is wrong. */
+private val sizeFormat = ThreadLocal.withInitial<java.text.NumberFormat> {
     java.text.NumberFormat.getNumberInstance().apply {
         minimumFractionDigits = 1
         maximumFractionDigits = 1
-    }.format(bytes / 1_048_576.0)
+    }
+}
+
+private fun recordingSizeMb(bytes: Long): String =
+    sizeFormat.get().format(bytes / 1_048_576.0)
