@@ -1035,6 +1035,18 @@ private fun TrendingPager(count: Int, activeIndex: Int, progress: Float, onNavig
  * Keep watching: 16:9 stills, 384 × 216 under the full hero, 336 × 189 once folded. After 3 s on a
  * card its preview plays inside the still (the card does not widen, nothing is drawn over it).
  */
+/** Lazy-row content types, so a live card never recomposes as a poster row and back. */
+private fun heroType(item: HeroItem): String = when (item) {
+    is HeroItem.MovieHero -> "movie"
+    is HeroItem.SeriesHero -> "series"
+    is HeroItem.LiveHero -> "live"
+}
+
+private fun trendingType(item: TrendingHomeItem): String = when (item) {
+    is TrendingHomeItem.Movie -> "movie"
+    is TrendingHomeItem.Series -> "series"
+}
+
 @Composable
 private fun KeepWatchingRow(
     title: String,
@@ -1060,7 +1072,7 @@ private fun KeepWatchingRow(
             contentPadding = PaddingValues(start = start, end = 64.mpx),
             modifier = Modifier.focusRestorer().focusGroup(),
         ) {
-            itemsIndexed(items, key = { _, item -> item.heroKey() }) { index, item ->
+            itemsIndexed(items, key = { _, item -> item.heroKey() }, contentType = { _, item -> heroType(item) }) { index, item ->
                 val meta = metadata[item.heroKey()]
                 val still = when (item) {
                     is HeroItem.MovieHero -> homeStill(meta?.backdropUrl, item.movie.backdropUrl, item.movie.posterUrl, null)
@@ -1197,7 +1209,7 @@ private fun ContinuePosterRow(
             contentPadding = PaddingValues(start = start, end = 64.mpx),
             modifier = Modifier.focusRestorer().focusGroup(),
         ) {
-            itemsIndexed(items, key = { _, item -> item.stableKey }) { index, item ->
+            itemsIndexed(items, key = { _, item -> item.stableKey }, contentType = { _, _ -> "poster" }) { index, item ->
                 StagePoster(
                     title = item.title,
                     onClick = { onItemClick(item) },
@@ -1280,7 +1292,7 @@ private fun TrendingPosterRow(
             contentPadding = PaddingValues(start = start, end = 64.mpx),
             modifier = Modifier.focusRestorer().focusGroup(),
         ) {
-            itemsIndexed(items, key = { _, item -> item.stableKey }) { index, item ->
+            itemsIndexed(items, key = { _, item -> item.stableKey }, contentType = { _, item -> trendingType(item) }) { index, item ->
                 StagePoster(
                     title = when (item) {
                         is TrendingHomeItem.Movie -> item.movie.name
