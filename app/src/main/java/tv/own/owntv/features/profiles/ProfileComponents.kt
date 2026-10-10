@@ -107,6 +107,9 @@ private fun PinDialogBody(title: String, onSubmit: (String) -> Unit, onDismiss: 
  * once, as the phone does, and [customPath] is the one it has now. A new profile has no id to store
  * one under yet, so the dialog holds the chosen file and hands it to [onConfirm] with the rest.
  */
+/** Avatar ids including "no avatar" (-1): hoisted so the picker stops allocating per recomposition. */
+private val AVATAR_IDS = (-1 until OwnTVAvatars.COUNT).toList()
+
 @Composable
 internal fun ProfileEditorDialog(
     initial: ProfileEntity?,
@@ -159,7 +162,7 @@ internal fun ProfileEditorDialog(
         tv.own.owntv.ui.stage.StagePopupLabel(stringResource(R.string.profiles_avatar).uppercase(), Modifier.padding(top = 18.mpx))
         val accent = stageAccent.accent
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.mpx), contentPadding = androidx.compose.foundation.layout.PaddingValues(6.mpx)) {
-            items((-1 until OwnTVAvatars.COUNT).toList()) { id -> // includes "no avatar" (-1)
+            items(AVATAR_IDS, key = { it }) { id -> // includes "no avatar" (-1)
                 tv.own.owntv.ui.stage.StageSurface(
                     onClick = { avatarId = id },
                     radius = 44.mpx,
