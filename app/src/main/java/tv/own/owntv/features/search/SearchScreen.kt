@@ -136,6 +136,7 @@ private fun entryType(e: Entry): String = when (e) {
     is Entry.Channel -> "channel"
     is Entry.Movie -> "movie"
     is Entry.Series -> "series"
+    is Entry.Programme -> "ontv"
     is Entry.AllChannels -> "all"
 }
 
