@@ -1,5 +1,9 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.hudOnAccent
+import tv.own.owntv.ui.theme.hudAccent
+import tv.own.owntv.ui.theme.hudShade
+import tv.own.owntv.ui.theme.hudInk
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -84,7 +88,7 @@ fun MiniPlayer(
     if (focused && onBack != null) BackHandler { onBack() }
     // Small windows show the four verbs that matter and park the window ones behind the "more" tile.
     var windowCluster by remember { mutableStateOf(false) }
-    val accent = OwnTVTheme.colors.accentOnVideo
+    val accent = hudAccent
 
     BoxWithConstraints(modifier = modifier.onFocusChanged { focused = it.hasFocus }.focusGroup()) {
         // The pill carries eight tiles at full width. Below this the window cannot hold them without
@@ -101,7 +105,7 @@ fun MiniPlayer(
         if (duration > 0L) {
             Box(
                 Modifier.align(Alignment.TopStart).fillMaxWidth().height(2.dp)
-                    .background(Color.White.copy(alpha = 0.18f))
+                    .background(hudInk.copy(alpha = 0.18f))
                     .drawBehind {
                         val frac = (positionState.value.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
                         val w = size.width * frac
@@ -113,13 +117,13 @@ fun MiniPlayer(
 
         Row(
             modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().alpha(controlsAlpha)
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)))
+                .background(Brush.verticalGradient(listOf(hudShade(0.6f), Color.Transparent)))
                 .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
         ) {
             Text(
                 meta.title ?: "",
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
+                color = hudInk,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().then(
@@ -133,8 +137,8 @@ fun MiniPlayer(
         Row(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp).alpha(controlsAlpha)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.62f))
-                .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                .background(hudShade(0.62f))
+                .border(1.dp, hudInk.copy(alpha = 0.12f), CircleShape)
                 .padding(horizontal = 6.dp, vertical = 5.dp)
                 .horizontalScroll(rememberScrollState())
                 .focusGroup(),
@@ -187,7 +191,7 @@ fun MiniPlayer(
 /** The hairline that groups the pill's verbs: sound — window — exit. */
 @Composable
 private fun PillSeparator() {
-    Box(Modifier.padding(horizontal = 2.dp).width(1.dp).height(20.dp).background(Color.White.copy(alpha = 0.18f)))
+    Box(Modifier.padding(horizontal = 2.dp).width(1.dp).height(20.dp).background(hudInk.copy(alpha = 0.18f)))
 }
 
 @Composable
@@ -198,7 +202,7 @@ private fun MiniBtn(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val accent = OwnTVTheme.colors.accentOnVideo
+    val accent = hudAccent
     FocusableSurface(
         onClick = onClick,
         modifier = modifier.size(if (lead) 38.dp else 30.dp),
@@ -210,19 +214,19 @@ private fun MiniBtn(
         showFocusBorder = !lead,
         focusedContainerColor = accent,
         // Play is the one accent circle; everything else is a small dark tile.
-        unfocusedContainerColor = if (lead) accent else Color.White.copy(alpha = 0.10f),
-        selectedContainerColor = if (lead) accent else Color.White.copy(alpha = 0.10f),
+        unfocusedContainerColor = if (lead) accent else hudInk.copy(alpha = 0.10f),
+        selectedContainerColor = if (lead) accent else hudInk.copy(alpha = 0.10f),
         contentAlignment = Alignment.Center,
     ) { focusedTile ->
         if (lead && focusedTile) {
-            Box(Modifier.matchParentSize().border(1.5.dp, Color.White.copy(alpha = 0.9f), CircleShape))
+            Box(Modifier.matchParentSize().border(1.5.dp, hudInk.copy(alpha = 0.9f), CircleShape))
         }
         OwnTVIcon(
             icon,
             tint = when {
-                lead -> OwnTVTheme.colors.onAccentOnVideo
+                lead -> hudOnAccent
                 focusedTile || active -> accent
-                else -> Color.White
+                else -> hudInk
             },
             filled = true,
             modifier = Modifier.size(if (lead) 19.dp else 16.dp),

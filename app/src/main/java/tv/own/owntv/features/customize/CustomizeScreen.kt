@@ -107,6 +107,8 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var showFilterPicker by remember { mutableStateOf(false) }
     // "…" in the tool row (P10B): New categories and the PIN lock.
     var showMoreMenu by remember { mutableStateOf(false) }
+    var restoringDefaults by remember { mutableStateOf(false) }
+    val restorePlaylist by vm.restorePlaylistName.collectAsStateWithLifecycle()
     val moreFocus = remember { FocusRequester() }
     val actionsFocus = remember { FocusRequester() }
     // The category whose Hide button was clicked to close a range — opens the Show/Hide/Cancel prompt.
@@ -134,7 +136,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     // Opener row for whichever dialog (new-category picker, rename) is open — restored on close so
     // focus doesn't always jump back to the Live TV section chip.
     var dialogReturn by tv.own.owntv.ui.components.rememberDialogFocusRestore(
-        anyDialogOpen = showNewCatPicker || showSortPicker || showFilterPicker || showMoreMenu || renaming != null || creatingCategory ||
+        anyDialogOpen = showNewCatPicker || showSortPicker || showFilterPicker || showMoreMenu || restoringDefaults || renaming != null || creatingCategory ||
             deletingCategory != null || rangeEnd != null || editingPin != null,
     )
 
@@ -417,6 +419,8 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 if (pinLock.pin == null) "PIN_SET" to stringResource(R.string.settings_customize_set_pin)
                 else "PIN_CHANGE" to stringResource(R.string.settings_customize_change_pin),
                 if (pinLock.pin != null) "PIN_REMOVE" to stringResource(R.string.settings_customize_remove_lock) else null,
+                // Undo for hide / rename / move / reorder, for the playlist(s) this screen shows.
+                CustomizeOption.RESTORE.name to stringResource(R.string.settings_customize_restore_defaults),
             ),
             selected = "",
             onSelect = { value ->
@@ -428,6 +432,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         editingPin = if (value == "PIN_SET") PinEdit.SET else PinEdit.CHANGE
                     }
                     "PIN_REMOVE" -> editingPin = PinEdit.REMOVE
+                    CustomizeOption.RESTORE.name -> restoringDefaults = true
                 }
             },
             onDismiss = { showMoreMenu = false },
@@ -485,6 +490,26 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
     // Custom category pending deletion (opened from the rename dialog's Delete) — confirmed first,
     // plan §3.5: "It must never touch content."
+    if (restoringDefaults) {
+        PinConfirmDialog(
+            title = stringResource(
+                R.string.settings_customize_restore_defaults_title,
+                stringResource(
+                    when (section) {
+                        MediaType.LIVE -> R.string.settings_live_tv
+                        MediaType.MOVIE -> R.string.settings_movies
+                        else -> R.string.settings_series
+                    },
+                ),
+                restorePlaylist ?: stringResource(R.string.content_all_playlists),
+            ),
+            message = stringResource(R.string.settings_customize_restore_defaults_description),
+            confirmLabel = stringResource(R.string.common_reset),
+            onConfirm = { vm.restoreSectionDefaults(); restoringDefaults = false },
+            onDismiss = { restoringDefaults = false },
+        )
+    }
+
     deletingCategory?.let { row ->
         PinConfirmDialog(
             title = stringResource(R.string.settings_customize_delete_category, row.displayName),
@@ -722,3 +747,6 @@ internal fun Modifier.upTo(target: FocusRequester): Modifier = onPreviewKeyEvent
     if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) runCatching { target.requestFocus() }
     true
 }
+
+/** Key of the restore entry in the More menu (the others are the screen's existing string keys). */
+private enum class CustomizeOption { RESTORE }

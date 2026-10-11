@@ -69,6 +69,9 @@ import tv.own.owntv.core.repository.SeriesRepository
 import tv.own.owntv.core.storage.StorageAccess
 import tv.own.owntv.core.storage.MediaFolders
 import tv.own.owntv.features.customize.MoveTarget
+import tv.own.owntv.features.customize.CategoryRestorePlan
+import tv.own.owntv.features.customize.planCategoryRestore
+import tv.own.owntv.features.customize.restoreCategoryToDefault
 import tv.own.owntv.features.live.LiveRailItem
 import tv.own.owntv.core.repository.activeProfileSources
 import tv.own.owntv.core.settings.SettingsRepository
@@ -566,6 +569,16 @@ class SeriesViewModel(
         .flatMapLatest { favoriteDao.observeFavoriteIds(it.profileId, MediaType.SERIES) }
         .map { it.toSet() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Per show, how far into its most recently watched episode this profile is — the bar on the
+     *  show's poster and list row. A finished latest episode has no entry: nothing left to resume. */
+    val seriesProgress: StateFlow<Map<Long, Float>> = ctx
+        .flatMapLatest { c -> if (c.profileId < 0) flowOf(emptyList()) else progressDao.observeLatestEpisodeProgressPerSeries(c.profileId) }
+        .map { rows ->
+            rows.filter { it.durationMs > 0 && it.positionMs < (it.durationMs * 0.95f).toLong() }
+                .associate { it.seriesId to it.positionMs.toFloat() / it.durationMs }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val episodes: StateFlow<List<EpisodeEntity>> = _openedSeries
         .flatMapLatest { s -> if (s == null) flowOf(emptyList()) else seriesDao.episodesBySeries(s.id) }
@@ -1150,6 +1163,35 @@ class SeriesViewModel(
     fun hideCategory(key: LiveKey) {
         viewModelScope.launch {
             categoryEditor.hide(currentProfileId() ?: return@launch, MediaType.SERIES, key)
+        }
+    }
+
+    /** The content_order / movedFromOrigin context behind a rail key, or null for All / Favorites / History. */
+    private fun categoryContextKey(key: LiveKey): String? = when (key) {
+        is LiveKey.Folder -> folderContextKeys.value[key.id]
+        is LiveKey.Custom -> key.id
+        else -> null
+    }
+
+    /** What restoring [key]'s category to the playlist default would undo (empty when nothing). */
+    suspend fun categoryRestorePlan(key: LiveKey): CategoryRestorePlan {
+        val contextKey = categoryContextKey(key) ?: return CategoryRestorePlan()
+        val pid = currentProfileId() ?: return CategoryRestorePlan()
+        return planCategoryRestore(customize, contentOrderDao, pid, MediaType.SERIES, contextKey, customCategoryDao) {
+            when (key) {
+                is LiveKey.Folder -> seriesDao.snapshotByCategoryManual(key.id, pid, contextKey, Int.MAX_VALUE)
+                    .mapTo(HashSet()) { CustomizeKeys.series(it) }
+                else -> customCategoryDao.stableItemKeys(pid, contextKey).toSet()
+            }
+        }
+    }
+
+    /** Back to the playlist's order and contents (see [restoreCategoryToDefault]). */
+    fun restoreCategory(key: LiveKey) {
+        val contextKey = categoryContextKey(key) ?: return
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            restoreCategoryToDefault(customize, contentOrderDao, pid, MediaType.SERIES, contextKey, categoryRestorePlan(key))
         }
     }
 

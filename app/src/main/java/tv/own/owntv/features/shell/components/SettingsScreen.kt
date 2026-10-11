@@ -1,5 +1,6 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.StageColors
 import tv.own.owntv.features.settings.SettingValue
 import tv.own.owntv.features.settings.labelRes
 import tv.own.owntv.features.settings.AccentSwatches
@@ -2020,7 +2021,7 @@ private fun FocusHighlightDialog(
         Column(Modifier.padding(top = 20.mpx)) {
             Box(
                 Modifier.fillMaxWidth().height(64.mpx)
-                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
+                    .background(StageColors.Ink.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
                     .border(widthDp.dp, ring, RoundedCornerShape(18.mpx)),
                 contentAlignment = Alignment.Center,
             ) {

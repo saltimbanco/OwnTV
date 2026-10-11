@@ -71,6 +71,7 @@ import tv.own.owntv.features.live.liveEpgShiftLabel
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVSpinner
 import tv.own.owntv.ui.stage.StageButton
+import tv.own.owntv.ui.stage.shownColor
 import tv.own.owntv.ui.stage.stageFocusLook
 import tv.own.owntv.ui.stage.StageSearchField
 import tv.own.owntv.ui.stage.StageTool
@@ -200,6 +201,7 @@ fun EpgScreen(
     val livePreviewSetting by liveVm.livePreviewEnabled.collectAsStateWithLifecycle()
     val previewChannel by liveVm.previewChannel.collectAsStateWithLifecycle()
     val previewArmed by liveVm.previewArmed.collectAsStateWithLifecycle()
+    val guidePreview by vm.guidePreview.collectAsStateWithLifecycle()
 
     // Live TV's Guide view shows Live TV's own category; the TV Guide keeps its own choice.
     val categoryKey: LiveKey? = if (liveMode) liveSelected.takeUnless { it == LiveKey.All } else categoryFilter
@@ -207,7 +209,9 @@ fun EpgScreen(
     LaunchedEffect(Unit) { vm.load() } // reload from DB each time the guide is opened
 
     // The focused channel plays in the video after the focus settles, as in Live TV.
-    val effectivePreview = previewEnabled && livePreviewSetting
+    val effectivePreview = previewEnabled && livePreviewSetting && guidePreview
+    // Switching the Guide's own preview off stops what is already playing, not only the next channel.
+    LaunchedEffect(guidePreview) { if (!guidePreview && previewEnabled) liveVm.stopPreview() }
     LaunchedEffect(previewChannel?.id, effectivePreview, previewArmed) {
         if (!effectivePreview || !previewArmed) return@LaunchedEffect
         val ch = previewChannel ?: return@LaunchedEffect
@@ -551,7 +555,7 @@ fun EpgScreen(
                                     vm = vm,
                                     channel = channel,
                                     name = rowName(channel),
-                                    dot = playlistMarks[channel.sourceId]?.color,
+                                    dot = playlistMarks[channel.sourceId]?.shownColor,
                                     labelWidth = labelW,
                                     numberWidth = numberWidth,
                                     windowStart = state.windowStart,
@@ -663,7 +667,12 @@ fun EpgScreen(
     }
     if (orderOpen) {
         val showEmpty by vm.showEmpty.collectAsStateWithLifecycle()
-        GuideOrderMenu(current = sortGuide, onPick = vm::setGuideSort, showEmpty = showEmpty, onShowEmpty = vm::setShowEmpty, onDismiss = { orderOpen = false })
+        GuideOrderMenu(
+            current = sortGuide, onPick = vm::setGuideSort,
+            showEmpty = showEmpty, onShowEmpty = vm::setShowEmpty,
+            showPreview = guidePreview, onShowPreview = vm::setGuidePreview,
+            onDismiss = { orderOpen = false },
+        )
     }
     channelMenuFor?.let { ch ->
         GuideChannelMenu(

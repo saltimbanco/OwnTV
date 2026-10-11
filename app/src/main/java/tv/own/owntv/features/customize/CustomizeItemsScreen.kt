@@ -157,6 +157,15 @@ fun CustomizeItemsScreen(
             // owner while Paging is empty (and the first row takes over later if data arrives).
             kotlinx.coroutines.delay(60)
             runCatching { backFocus.requestFocus() }
+        } else if (!firstLanding && focusedItemIndex >= items.itemCount) {
+            // The focused row left the list (removed from this category): its actions must not stay
+            // in the panel, and focus must not stay on them.
+            kotlinx.coroutines.delay(60)
+            if (items.itemCount == 0) {
+                runCatching { backFocus.requestFocus() }
+            } else {
+                items[items.itemCount - 1]?.let { rowFocusers[it.key] }?.let { runCatching { it.requestFocus() } }
+            }
         }
     }
 
@@ -209,6 +218,10 @@ fun CustomizeItemsScreen(
             )
         },
         list = { pos ->
+            // The page's own panel: with the last row gone nothing else replaces its actions.
+            val pagePanel = tv.own.owntv.features.settings.LocalSettingsPanel.current
+            val emptied = !firstLanding && items.itemCount == 0
+            LaunchedEffect(emptied) { if (emptied) pagePanel?.help = null }
             Column(pos) {
                 if (rangeAnchorKey != null) {
                     StageSettingRow(

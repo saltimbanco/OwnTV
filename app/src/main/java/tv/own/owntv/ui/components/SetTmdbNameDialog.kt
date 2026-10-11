@@ -69,7 +69,7 @@ fun SetTmdbNameDialog(
         val ime = LocalTvImeMetrics.current
         val density = LocalDensity.current
         BoxWithConstraints(
-            Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)).trapAllFocusExit().focusGroup(),
+            Modifier.fillMaxSize().background(StageColors.Scrim).trapAllFocusExit().focusGroup(),
             contentAlignment = if (ime.visible) Alignment.TopCenter else Alignment.Center,
         ) {
             val top = 40.mpx

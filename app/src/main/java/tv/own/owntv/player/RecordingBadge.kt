@@ -1,5 +1,7 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.hudShade
+import tv.own.owntv.ui.theme.hudInk
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -79,7 +81,7 @@ fun RecordingBadge(modifier: Modifier = Modifier) {
         modifier = modifier
             .padding(top = 18.dp, end = 22.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color.Black.copy(alpha = 0.55f))
+            .background(hudShade(0.55f))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -93,7 +95,7 @@ fun RecordingBadge(modifier: Modifier = Modifier) {
         )
         Text(
             text = stringResource(R.string.recording_badge),
-            color = Color.White,
+            color = hudInk,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
         )

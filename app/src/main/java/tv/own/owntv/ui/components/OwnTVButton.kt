@@ -1,5 +1,6 @@
 package tv.own.owntv.ui.components
 
+import tv.own.owntv.ui.theme.StageColors
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -138,7 +139,7 @@ private fun StagePopupButton(
         radius = 14.dp,
         enabled = enabled,
         modifier = modifier.then(if (enabled) Modifier else Modifier.alpha(0.45f)),
-        idle = Modifier.background(if (primary) a.accent.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f), shape),
+        idle = Modifier.background(if (primary) a.accent.copy(alpha = 0.2f) else StageColors.Ink.copy(alpha = 0.08f), shape),
         contentAlignment = Alignment.Center,
     ) { focused ->
         val content = when {

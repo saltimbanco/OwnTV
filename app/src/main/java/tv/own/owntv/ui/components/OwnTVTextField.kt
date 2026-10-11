@@ -1,5 +1,7 @@
 package tv.own.owntv.ui.components
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.StageColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -106,7 +108,7 @@ fun OwnTVTextField(
     // materials; glass keeps its faint white hairline for the idle edge.
     val borderColor = when {
         focused || eyeFocused -> colors.focusBorder
-        glassy -> Color.White.copy(alpha = 0.22f)
+        glassy -> stageTone(Color.White.copy(alpha = 0.22f), StageColors.Ink.copy(alpha = 0.12f))
         else -> colors.outlineVariant
     }
 

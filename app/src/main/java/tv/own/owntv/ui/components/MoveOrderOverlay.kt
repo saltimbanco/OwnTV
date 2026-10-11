@@ -1,5 +1,7 @@
 package tv.own.owntv.ui.components
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.StageColors
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -79,7 +81,8 @@ fun MoveOrderOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.88f))
+            // Light: the paper at 92%, so the list being reordered reads as clearly as on black.
+            .background(stageTone(Color.Black.copy(alpha = 0.88f), StageColors.Wash.copy(alpha = 0.92f)))
             .trapAllFocusExit()
             .focusGroup()
             .onKeyEvent { event ->

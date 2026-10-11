@@ -1,5 +1,9 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.hudOnAccent
+import tv.own.owntv.ui.theme.hudAccent
+import tv.own.owntv.ui.theme.hudShade
+import tv.own.owntv.ui.theme.hudInk
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
@@ -53,8 +57,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
@@ -89,26 +96,26 @@ internal fun CircleButton(icon: OwnTVIcon, size: Int, primary: Boolean = false, 
     // Focus fills the button with the accent and rings it in a white hairline. The glyph takes
     // onAccentOnVideo rather than a fixed dark, so a deep custom accent still gets a readable icon —
     // that role is already derived from the seed's luminance, which is the check this needs.
-    val accent = OwnTVTheme.colors.accentOnVideo
+    val accent = hudAccent
     FocusableSurface(
         onClick = onClick,
         modifier = modifier.size(size.dp),
         shape = CircleShape,
         focusedScale = 1.1f,
         focusedContainerColor = accent,
-        unfocusedContainerColor = if (primary) Color.White.copy(alpha = 0.95f) else Color.White.copy(alpha = 0.10f),
-        selectedContainerColor = Color.White.copy(alpha = 0.10f),
+        unfocusedContainerColor = if (primary) hudInk.copy(alpha = 0.95f) else hudInk.copy(alpha = 0.10f),
+        selectedContainerColor = hudInk.copy(alpha = 0.10f),
         contentAlignment = Alignment.Center,
     ) { focused ->
         if (focused) {
-            Box(Modifier.matchParentSize().border(1.dp, Color.White.copy(alpha = 0.9f), CircleShape))
+            Box(Modifier.matchParentSize().border(1.dp, hudInk.copy(alpha = 0.9f), CircleShape))
         }
         OwnTVIcon(
             icon,
             tint = when {
-                focused -> OwnTVTheme.colors.onAccentOnVideo
-                primary -> Color(0xFF0E1513)
-                else -> Color.White
+                focused -> hudOnAccent
+                primary -> tv.own.owntv.ui.theme.stageTone(Color(0xFF0E1513), Color.White)
+                else -> hudInk
             },
             filled = true,
             modifier = Modifier.size((size * 0.42f).dp),
@@ -122,8 +129,8 @@ internal fun TransportCapsule(modifier: Modifier = Modifier, content: @Composabl
     Row(
         modifier
             .clip(RoundedCornerShape(44.dp))
-            .background(Color.Black.copy(alpha = 0.55f))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(44.dp))
+            .background(hudShade(0.55f))
+            .border(1.dp, hudInk.copy(alpha = 0.10f), RoundedCornerShape(44.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp)
             .focusGroup(),
         verticalAlignment = Alignment.CenterVertically,
@@ -138,11 +145,12 @@ internal fun TransportCapsule(modifier: Modifier = Modifier, content: @Composabl
  */
 @Composable
 internal fun Dock(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    // No clip: the fill and rim already take the shape, and a clip cut off the seek bar's time bubble,
+    // which floats above band A — outside the dock.
     Column(
         modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color.Black.copy(alpha = 0.55f))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(22.dp))
+            .background(hudShade(0.55f), RoundedCornerShape(22.dp))
+            .border(1.dp, hudInk.copy(alpha = 0.10f), RoundedCornerShape(22.dp))
             .padding(horizontal = 18.dp, vertical = 12.dp),
         content = content,
     )
@@ -155,7 +163,7 @@ internal fun TimeCap(text: String, alignment: Alignment.Horizontal) {
         Text(
             text,
             style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
-            color = Color.White.copy(alpha = 0.7f),
+            color = hudInk.copy(alpha = 0.7f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -282,8 +290,8 @@ internal fun SpeedButton(label: String, active: Boolean, toolLabel: String, onCl
         shape = RoundedCornerShape(12.dp),
         // Focus as light: the accent rim, a 22% wash of it and a soft bloom, all from the accent that
         // reads over video. Reduce animations keeps the rim and drops the bloom.
-        focusLight = OwnTVTheme.colors.accentOnVideo,
-        focusedContainerColor = Color.White.copy(alpha = 0.16f),
+        focusLight = hudAccent,
+        focusedContainerColor = hudInk.copy(alpha = 0.16f),
         unfocusedContainerColor = Color.Transparent,
         selectedContainerColor = Color.Transparent,
         contentAlignment = Alignment.Center,
@@ -291,7 +299,7 @@ internal fun SpeedButton(label: String, active: Boolean, toolLabel: String, onCl
         // The rate itself is the icon — the extra ">>" glyph read as a seek control next to the real
         // rewind/forward buttons, and "1.0x" already says everything the button does. Focused, the
         // word "Speed" joins it so the rate is not the only thing naming the button.
-        val tint = if (active) OwnTVTheme.colors.accentOnVideo else if (focused) Color.White else Color.White.copy(alpha = 0.78f)
+        val tint = if (active) hudAccent else if (focused) hudInk else hudInk.copy(alpha = 0.78f)
         Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = tint, fontWeight = FontWeight.SemiBold)
             ExpandingLabel(focused, toolLabel, value = null, tint = tint)
@@ -316,8 +324,8 @@ internal fun EngineToggle(label: String, active: Boolean, toolLabel: String, onC
         shape = RoundedCornerShape(12.dp),
         // Focus as light: the accent rim, a 22% wash of it and a soft bloom, all from the accent that
         // reads over video. Reduce animations keeps the rim and drops the bloom.
-        focusLight = OwnTVTheme.colors.accentOnVideo,
-        focusedContainerColor = Color.White.copy(alpha = 0.16f),
+        focusLight = hudAccent,
+        focusedContainerColor = hudInk.copy(alpha = 0.16f),
         unfocusedContainerColor = Color.Transparent,
         selectedContainerColor = Color.Transparent,
         contentAlignment = Alignment.Center,
@@ -327,7 +335,7 @@ internal fun EngineToggle(label: String, active: Boolean, toolLabel: String, onC
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            val tint = if (active) OwnTVTheme.colors.accentOnVideo else if (focused) Color.White else Color.White.copy(alpha = 0.78f)
+            val tint = if (active) hudAccent else if (focused) hudInk else hudInk.copy(alpha = 0.78f)
             OwnTVIcon(OwnTVIcon.SWAP, tint = tint, filled = true, modifier = Modifier.size(16.dp))
             // The engine name stays the value; focus adds the word for the thing it switches, so the
             // pill reads "EXO Player" rather than leaving MPV/EXO to be guessed at.
@@ -344,7 +352,7 @@ internal fun CtrlButton(
     active: Boolean = false,
     // The favourite heart stays coral here instead of taking the accent, so one colour means
     // "favourite" everywhere in the app — browse rows, posters and the player alike.
-    activeTint: Color = OwnTVTheme.colors.accentOnVideo,
+    activeTint: Color = hudAccent,
     label: String,
     onClick: () -> Unit,
 ) {
@@ -355,14 +363,14 @@ internal fun CtrlButton(
         shape = RoundedCornerShape(12.dp),
         // Focus as light: the accent rim, a 22% wash of it and a soft bloom, all from the accent that
         // reads over video. Reduce animations keeps the rim and drops the bloom.
-        focusLight = OwnTVTheme.colors.accentOnVideo,
-        focusedContainerColor = Color.White.copy(alpha = 0.16f),
+        focusLight = hudAccent,
+        focusedContainerColor = hudInk.copy(alpha = 0.16f),
         unfocusedContainerColor = Color.Transparent,
         selectedContainerColor = Color.Transparent,
         contentAlignment = Alignment.Center,
     ) { focused ->
         val pad by animateDpAsState(if (focused) 12.dp else 0.dp, ownTvTween(140), label = "toolPadding")
-        val tint = if (active) activeTint else if (focused) Color.White else Color.White.copy(alpha = 0.78f)
+        val tint = if (active) activeTint else if (focused) hudInk else hudInk.copy(alpha = 0.78f)
         Row(Modifier.padding(horizontal = pad), verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center) {
                 OwnTVIcon(icon, tint = tint, filled = true, modifier = Modifier.size(22.dp))
@@ -370,10 +378,10 @@ internal fun CtrlButton(
                 // label instead, where it no longer covers a third of the glyph.
                 if (badge != null && !focused) {
                     Box(
-                        Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(OwnTVTheme.colors.accentOnVideo),
+                        Modifier.align(Alignment.TopEnd).size(15.dp).clip(CircleShape).background(hudAccent),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(stringResource(R.string.common_number_grouped, badge), style = MaterialTheme.typography.labelSmall, color = OwnTVTheme.colors.onAccentOnVideo, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.common_number_grouped, badge), style = MaterialTheme.typography.labelSmall, color = hudOnAccent, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -389,8 +397,8 @@ internal fun CtrlButton(
 @Composable
 private fun BoxScope.Playhead(frac: Float) {
     Box(Modifier.fillMaxWidth(frac), contentAlignment = Alignment.CenterEnd) {
-        Box(Modifier.size(26.dp).clip(CircleShape).background(OwnTVTheme.colors.accentOnVideo.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(14.dp).clip(CircleShape).background(OwnTVTheme.colors.accentOnVideo))
+        Box(Modifier.size(26.dp).clip(CircleShape).background(hudAccent.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(14.dp).clip(CircleShape).background(hudAccent))
         }
     }
 }
@@ -418,29 +426,39 @@ internal fun SeekBar(positionMs: Long, durationMs: Long, bufferedMs: Long, stepM
             .focusable(interactionSource = interaction),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.fillMaxWidth().height(if (focused) 6.dp else 4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = if (focused) 0.4f else 0.22f))) {
-            Box(Modifier.fillMaxWidth(bufferedFrac).fillMaxHeight().clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.28f)))
-            Box(Modifier.fillMaxWidth(frac).fillMaxHeight().clip(RoundedCornerShape(50)).background(OwnTVTheme.colors.accentOnVideo))
+        Box(Modifier.fillMaxWidth().height(if (focused) 6.dp else 4.dp).clip(RoundedCornerShape(50)).background(hudInk.copy(alpha = if (focused) 0.4f else 0.22f))) {
+            Box(Modifier.fillMaxWidth(bufferedFrac).fillMaxHeight().clip(RoundedCornerShape(50)).background(hudInk.copy(alpha = 0.28f)))
+            Box(Modifier.fillMaxWidth(frac).fillMaxHeight().clip(RoundedCornerShape(50)).background(hudAccent))
         }
         if (focused) {
             Playhead(frac)
             // Time-remaining bubble above the thumb (elapsed is shown at the bar's left, total at the right,
             // so the bubble shows what's LEFT: "-12:34"). Uses a negative offset (not bottom padding) so it
             // floats clear above the 24dp-tall bar — padding can't lift it out of the height-constrained parent.
-            Box(Modifier.fillMaxWidth(frac), contentAlignment = Alignment.CenterEnd) {
+            // Centred on the thumb but held inside the bar, so it never slides off either end.
+            Box(Modifier.fillMaxWidth()) {
                 Box(
-                    Modifier.offset(y = (-32).dp).clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.9f)).padding(horizontal = 8.dp, vertical = 3.dp),
+                    Modifier.atFraction(frac).offset(y = (-32).dp).clip(RoundedCornerShape(8.dp)).background(hudShade(0.9f)).padding(horizontal = 8.dp, vertical = 3.dp),
                 ) {
                     Text(
                         stringResource(R.string.player_time_remaining, formatTime((durationMs - positionMs).coerceAtLeast(0))),
                         style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
-                        color = Color.White,
+                        color = hudInk,
                     )
                 }
             }
         }
     }
     }
+}
+
+/** Places the element centred at [fraction] of the parent's width, clamped so it stays fully inside. */
+private fun Modifier.atFraction(fraction: Float): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(Constraints())
+    val width = constraints.maxWidth
+    val x = (fraction * width - placeable.width / 2f).roundToInt()
+        .coerceIn(0, (width - placeable.width).coerceAtLeast(0))
+    layout(width, placeable.height) { placeable.place(x, 0) }
 }
 
 internal const val LIVE_SCRUB_STEP_SEC = 60     // per Left/Right press (hold to scrub fast); buttons stay 30 s
@@ -482,8 +500,8 @@ internal fun LiveTimelineBar(
             .focusable(interactionSource = interaction),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.fillMaxWidth().height(if (focused) 6.dp else 4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = if (focused) 0.4f else 0.22f))) {
-            Box(Modifier.fillMaxWidth(frac).fillMaxHeight().clip(RoundedCornerShape(50)).background(OwnTVTheme.colors.accentOnVideo))
+        Box(Modifier.fillMaxWidth().height(if (focused) 6.dp else 4.dp).clip(RoundedCornerShape(50)).background(hudInk.copy(alpha = if (focused) 0.4f else 0.22f))) {
+            Box(Modifier.fillMaxWidth(frac).fillMaxHeight().clip(RoundedCornerShape(50)).background(hudAccent))
         }
         // N4 — where the saved copy has no picture (the connection dropped): dark, so a jump over it is
         // expected rather than a surprise. Read here, where the bar redraws with the ticking offset.
@@ -492,7 +510,7 @@ internal fun LiveTimelineBar(
                 Box(
                     Modifier.fillMaxWidth((span.endFrac - span.startFrac) / span.endFrac)
                         .height(if (focused) 6.dp else 4.dp)
-                        .background(Color.Black.copy(alpha = 0.75f)),
+                        .background(hudShade(0.75f)),
                 )
             }
         }
@@ -509,7 +527,7 @@ internal fun LiveTimelineBar(
             Box(Modifier.fillMaxWidth(tick.startFrac), contentAlignment = Alignment.CenterEnd) {
                 Box(
                     Modifier.width(if (current) 2.dp else 1.dp).height(if (focused) 12.dp else 10.dp)
-                        .background(Color.White.copy(alpha = if (current) 0.85f else 0.35f)),
+                        .background(hudInk.copy(alpha = if (current) 0.85f else 0.35f)),
                 )
             }
         }
@@ -520,7 +538,7 @@ internal fun LiveTimelineBar(
         if (focused) {
             Playhead(frac)
             Box(Modifier.fillMaxWidth(frac), contentAlignment = Alignment.CenterEnd) {
-                Box(Modifier.padding(bottom = 30.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.9f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                Box(Modifier.padding(bottom = 30.dp).clip(RoundedCornerShape(8.dp)).background(hudShade(0.9f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                     // What you are scrubbing INTO, by name — "20:54 · Premier League" says far more than
                     // "−12:04 behind" about whether to stop here. Falls back to the bare offset wherever
                     // the guide has nothing for this channel.
@@ -532,7 +550,7 @@ internal fun LiveTimelineBar(
                             else -> stringResource(R.string.player_live_offset, mmss(offsetSec))
                         },
                         style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
-                        color = Color.White,
+                        color = hudInk,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 320.dp),

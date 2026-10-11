@@ -1,5 +1,7 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.hudShade
+import tv.own.owntv.ui.theme.hudInk
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +55,7 @@ fun StreamInfoOverlay(player: PlaybackEngine, modifier: Modifier = Modifier) {
         modifier = modifier
             .widthIn(min = 300.dp, max = 460.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.78f))
+            .background(hudShade(0.78f))
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
@@ -76,7 +78,7 @@ fun StreamInfoOverlay(player: PlaybackEngine, modifier: Modifier = Modifier) {
                 Text(
                     row.value.displayText(res),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White,
+                    color = hudInk,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.weight(0.62f),
                     maxLines = 2,

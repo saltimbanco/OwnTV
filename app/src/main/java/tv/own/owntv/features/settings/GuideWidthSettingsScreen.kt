@@ -1,5 +1,6 @@
 package tv.own.owntv.features.settings
 
+import tv.own.owntv.ui.theme.StageColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -125,7 +126,7 @@ private fun GuideWidthDiagram(shares: GuideWidthShares) {
     // The two columns at their widths, in the Stage colours: channels in accent, the guide plain.
     val a = tv.own.owntv.ui.theme.stageAccent
     androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().height(52.mpx), horizontalArrangement = Arrangement.spacedBy(6.mpx)) {
-        listOf(shares.channels to a.accent.copy(alpha = 0.32f), shares.epg to Color.White.copy(alpha = 0.08f)).forEach { (w, fill) ->
+        listOf(shares.channels to a.accent.copy(alpha = 0.32f), shares.epg to tv.own.owntv.ui.theme.StageColors.Ink.copy(alpha = 0.08f)).forEach { (w, fill) ->
             Box(Modifier.weight(w.toFloat()).fillMaxSize().background(fill, RoundedCornerShape(10.mpx)), contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.common_percent, w), style = tv.own.owntv.ui.theme.stageText(15, 700), color = tv.own.owntv.ui.theme.StageColors.Text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
