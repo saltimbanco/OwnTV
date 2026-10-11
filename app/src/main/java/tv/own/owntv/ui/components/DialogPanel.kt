@@ -49,5 +49,12 @@ fun Modifier.dialogPanel(
 }
 
 /** Shared modal wash, as the Stage menus draw it: the screen behind stays readable, the popup in front. */
-fun Modifier.modalScrim(strength: Float = 1f): Modifier =
-    background(Color(2, 5, 6).copy(alpha = (0.55f * strength.coerceIn(0f, 1.35f)).coerceAtMost(0.72f)))
+/** In light it is `.mine.light .scrim`, rgb(20,32,28) 30%, scaled the same way. */
+@androidx.compose.runtime.Composable
+fun Modifier.modalScrim(strength: Float = 1f): Modifier {
+    val s = strength.coerceIn(0f, 1.35f)
+    return background(
+        if (tv.own.owntv.ui.theme.LocalStagePalette.current.isLight) Color(20, 32, 28).copy(alpha = (0.30f * s).coerceAtMost(0.40f))
+        else Color(2, 5, 6).copy(alpha = (0.55f * s).coerceAtMost(0.72f)),
+    )
+}

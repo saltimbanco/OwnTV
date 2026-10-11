@@ -1,5 +1,8 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.hudAccent
+import tv.own.owntv.ui.theme.hudShade
+import tv.own.owntv.ui.theme.hudInk
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -107,8 +110,8 @@ internal fun TopBar(
                         addAll(chips) // aspect · resolution · fps · audio
                     }
                     parts.forEachIndexed { i, label ->
-                        if (i > 0) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
-                        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+                        if (i > 0) Box(Modifier.size(3.dp).clip(CircleShape).background(hudInk.copy(alpha = 0.3f)))
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = hudInk.copy(alpha = 0.5f))
                     }
                     // The LIVE badge has left the top bar: live status belongs beside the timeline that
                     // describes it, so it is now the stateful badge at the right end of the dock's band A.
@@ -126,20 +129,20 @@ internal fun TopBar(
                         Text(
                             it,
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White.copy(alpha = 0.45f),
+                            color = hudInk.copy(alpha = 0.45f),
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.width(10.dp))
                     }
-                    Text(displayTitle, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(displayTitle, style = MaterialTheme.typography.titleMedium, color = hudInk, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             } else {
                 vodSubtitle?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.45f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = hudInk.copy(alpha = 0.45f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(displayTitle, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(displayTitle, style = MaterialTheme.typography.titleMedium, color = hudInk, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(2.dp))
                 chipRow()
             }
@@ -180,7 +183,7 @@ internal fun ChannelOsdCard(
     guide: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier.widthIn(max = if (guide != null) 420.dp else 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(14.dp),
+        modifier = modifier.widthIn(max = if (guide != null) 420.dp else 340.dp).clip(RoundedCornerShape(14.dp)).background(hudShade(0.55f)).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF004F46)), contentAlignment = Alignment.Center) {
@@ -188,9 +191,9 @@ internal fun ChannelOsdCard(
             else Text((title ?: "?").take(3).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color(0xFF6FF8E4), fontWeight = FontWeight.Bold)
         }
         Column {
-            Text(title ?: "", style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title ?: "", style = MaterialTheme.typography.titleSmall, color = hudInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             subtitle?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(it, style = MaterialTheme.typography.labelSmall, color = hudInk.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             guide?.invoke()
         }
@@ -225,20 +228,21 @@ internal fun ChannelNumberCard(digits: String, error: String? = null, modifier: 
     }
     val countdown = remember { Animatable(0f) }
     // Captured before the draw lambda: a DrawScope is not a composable, so it can't read the theme.
-    val accent = OwnTVTheme.colors.accentOnVideo
+    val accent = hudAccent
     LaunchedEffect(digits, error) {
         if (error != null) { countdown.snapTo(0f); return@LaunchedEffect }
         countdown.snapTo(1f)
         countdown.animateTo(0f, tween(DIRECT_TUNE_TIMEOUT_MS.toInt(), easing = LinearEasing))
     }
+    val track = hudInk.copy(alpha = 0.08f)
     Column(
-        modifier.widthIn(min = 148.dp, max = 340.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.55f))
+        modifier.widthIn(min = 148.dp, max = 340.dp).clip(RoundedCornerShape(14.dp)).background(hudShade(0.55f))
             // Painted, not laid out: a real bar would fillMaxWidth and stretch the card to its max width.
             .drawWithContent {
                 drawContent()
                 val barHeight = 3.dp.toPx()
                 val top = Offset(0f, size.height - barHeight)
-                drawRect(Color.White.copy(alpha = 0.08f), topLeft = top, size = Size(size.width, barHeight))
+                drawRect(track, topLeft = top, size = Size(size.width, barHeight))
                 drawRect(accent, topLeft = top, size = Size(size.width * countdown.value, barHeight))
             }
             .padding(bottom = 3.dp),
@@ -252,7 +256,7 @@ internal fun ChannelNumberCard(digits: String, error: String? = null, modifier: 
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     digits,
-                    style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineSmall, color = hudInk, fontWeight = FontWeight.Bold,
                     letterSpacing = 3.sp,
                 )
                 if (error == null) {
@@ -296,7 +300,7 @@ internal fun CenterControls(
             Text(
                 if (timeshiftOffsetSec <= 1) stringResource(R.string.player_at_live_edge) else stringResource(R.string.player_behind_live, mmss(timeshiftOffsetSec)),
                 style = MaterialTheme.typography.labelLarge,
-                color = OwnTVTheme.colors.accentOnVideo,
+                color = hudAccent,
             )
             Spacer(Modifier.height(12.dp))
         }
@@ -569,20 +573,20 @@ internal fun NextEpisodeCard(
         modifier = modifier
             .widthIn(max = 360.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.Black.copy(alpha = 0.82f))
+            .background(hudShade(0.82f))
             .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         Text(
             stringResource(R.string.player_next_episode, seconds()),
             style = MaterialTheme.typography.labelLarge,
-            color = colors.accentOnVideo,
+            color = hudAccent,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(4.dp))
         Text(
             title,
             style = MaterialTheme.typography.titleSmall,
-            color = Color.White,
+            color = hudInk,
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )

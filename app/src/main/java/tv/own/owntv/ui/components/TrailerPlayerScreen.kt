@@ -80,7 +80,14 @@ import androidx.compose.runtime.setValue
  * we hand off to an external "Open in YouTube" intent and exit — the button always does *something*.
  */
 @Composable
-fun TrailerPlayerScreen(videoKey: String, title: String? = null, onExit: () -> Unit) {
+fun TrailerPlayerScreen(videoKey: String, title: String? = null, onExit: () -> Unit) =
+    // Video keeps its dark chrome in every theme.
+    androidx.compose.runtime.CompositionLocalProvider(tv.own.owntv.ui.theme.LocalStagePalette provides tv.own.owntv.ui.theme.StagePalette.Dark) {
+        TrailerPlayerContent(videoKey, title, onExit)
+    }
+
+@Composable
+private fun TrailerPlayerContent(videoKey: String, title: String?, onExit: () -> Unit) {
     val context = LocalContext.current
     // The stored value may hold several keys, best first (core TrailerKeys): a blocked one moves on to the next.
     val keys = remember(videoKey) { tv.own.owntv.core.metadata.TrailerKeys.split(videoKey).ifEmpty { listOf(videoKey) } }

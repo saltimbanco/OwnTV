@@ -1,5 +1,6 @@
 package tv.own.owntv.features.settings
 
+import tv.own.owntv.ui.theme.stageTone
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -499,7 +500,7 @@ private fun HostingCard(state: CompanionServerState.Listening, deviceName: Strin
         modifier = Modifier
             .width(HOSTING_CARD_WIDTH)
             .clip(RoundedCornerShape(26.mpx))
-            .background(Color.White.copy(alpha = 0.05f))
+            .background(StageColors.Ink.copy(alpha = 0.05f))
             .padding(horizontal = 18.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -642,7 +643,7 @@ private fun DirectionBlock(vm: LocalSyncViewModel, step: LocalSyncViewModel.Step
             desc = stringResource(R.string.local_sync_unpair_description),
             iconTint = DestructiveRed,
             iconBackground = DestructiveTile,
-            titleTint = DestructiveTitle,
+            titleTint = stageTone(DestructiveTitle, StageColors.Danger),
             onClick = { vm.unpair(step.device); vm.cancel() },
         )
         Row(Modifier.fillMaxWidth().padding(top = 22.mpx), horizontalArrangement = Arrangement.End) {

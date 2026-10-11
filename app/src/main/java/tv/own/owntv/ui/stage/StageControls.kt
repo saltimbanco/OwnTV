@@ -51,6 +51,8 @@ import tv.own.owntv.ui.components.LocalTvImeMetrics
 import tv.own.owntv.ui.components.LocalTvImeWatcher
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.StageColors
+import tv.own.owntv.ui.theme.LocalStagePalette
+import androidx.compose.foundation.border
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
@@ -74,6 +76,8 @@ fun StageSearchField(
     autoEdit: Boolean = false,
     /** Set = OK calls this instead of editing here (a full page's search hands over to Settings search). */
     onActivate: (() -> Unit)? = null,
+    /** Typing started (true) or ended (false) — so a host can leave ◀/▶ to the text cursor meanwhile. */
+    onEditingChange: (Boolean) -> Unit = {},
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pillFocused by interaction.collectIsFocusedAsState()
@@ -88,6 +92,7 @@ fun StageSearchField(
     val imeMetrics = LocalTvImeMetrics.current
     val focus = stageAccent.focus
     LaunchedEffect(editing) {
+        onEditingChange(editing)
         if (editing) {
             imeWatcher?.onImeRequested()
             runCatching { fieldFocus.requestFocus() }
@@ -178,7 +183,9 @@ fun StageKeyHints(hints: List<Pair<String, String>>, modifier: Modifier = Modifi
                         .defaultMinSize(minWidth = 34.mpx)
                         .height(30.mpx)
                         // The mockup's 2 px bottom shade is left out: on the TV it read as a stray bar (owner).
-                        .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.mpx))
+                        .background(LocalStagePalette.current.keycap, RoundedCornerShape(8.mpx))
+                        // `.mine.light .kc`: a white cap needs an ink rim to stand off the white glass.
+                        .then(if (LocalStagePalette.current.isLight) Modifier.border(1.mpx, StageColors.Ink.copy(alpha = 0.1f), RoundedCornerShape(8.mpx)) else Modifier)
                         .padding(horizontal = 8.mpx),
                     contentAlignment = Alignment.Center,
                 ) { Text(key, style = stageText(14, 800), color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -222,12 +229,14 @@ fun StageSpecChip(text: String) {
 @Composable
 fun StageProgress(fraction: Float, modifier: Modifier = Modifier, flat: Boolean = false) {
     val a = stageAccent
+    val ink = StageColors.Ink
     Box(
         modifier
             .height(if (flat) 4.mpx else 6.mpx)
             .drawBehind {
                 val r = CornerRadius(size.height / 2f)
-                drawRoundRect(Color.White.copy(alpha = if (flat) 0.10f else 0.12f), cornerRadius = r)
+                drawRoundRect(ink.copy(alpha = if (flat) 0.10f else 0.12f), cornerRadius = r)
+
                 val w = size.width * fraction.coerceIn(0f, 1f)
                 if (w > 0f) {
                     val fill = if (flat) Brush.linearGradient(listOf(a.accent, a.accent))

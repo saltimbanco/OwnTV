@@ -1,5 +1,6 @@
 package tv.own.owntv.features.setup
 
+import tv.own.owntv.ui.theme.stageTone
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -140,4 +141,4 @@ private fun RemotePanel(state: CompanionServerState) {
     Box(Modifier.size(18.mpx))
 }
 
-private val PanelText = Color(0xFFD3DCD8)
+private val PanelText: Color @Composable get() = stageTone(Color(0xFFD3DCD8), StageColors.Body)

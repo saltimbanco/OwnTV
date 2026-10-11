@@ -75,7 +75,7 @@ fun StagePopup(
         val ime = LocalTvImeMetrics.current
         val density = LocalDensity.current
         BoxWithConstraints(
-            Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)).trapAllFocusExit().focusGroup(),
+            Modifier.fillMaxSize().background(StageColors.Scrim).trapAllFocusExit().focusGroup(),
             contentAlignment = if (ime.visible) Alignment.TopCenter else Alignment.Center,
         ) {
             val edge = 40.mpx
@@ -255,11 +255,12 @@ fun StagePopupOption(
 @Composable
 fun StagePopupRadio(on: Boolean, focused: Boolean) {
     val a = stageAccent
+    val dim = StageColors.Dim
     Box(
         Modifier.size(24.mpx).drawBehind {
             val r = size.minDimension / 2f
             if (on) drawInnerRing(if (focused) Color.White else a.accent, 7.mpx.toPx(), r)
-            else drawInnerRing(StageColors.Dim, 2.mpx.toPx(), r)
+            else drawInnerRing(dim, 2.mpx.toPx(), r)
         },
     )
 }
@@ -269,11 +270,12 @@ fun StagePopupRadio(on: Boolean, focused: Boolean) {
 fun StagePopupCheck(on: Boolean, focused: Boolean) {
     val a = stageAccent
     val fill = if (focused) Color.White else a.accent
+    val dim = StageColors.Dim
     Box(
         Modifier.size(24.mpx).drawBehind {
             val r = 7.mpx.toPx()
             if (on) drawRoundRect(fill, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
-            else drawRoundRect(StageColors.Dim, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r), style = androidx.compose.ui.graphics.drawscope.Stroke(2.mpx.toPx()))
+            else drawRoundRect(dim, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r), style = androidx.compose.ui.graphics.drawscope.Stroke(2.mpx.toPx()))
         },
         contentAlignment = Alignment.Center,
     ) {
@@ -290,7 +292,7 @@ fun StagePopupIcon(icon: OwnTVIcon, tint: Color = StageColors.Text) {
 /** The 1 px line between a popup's parts. */
 @Composable
 fun StagePopupDivider() {
-    Box(Modifier.padding(vertical = 18.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.10f)))
+    Box(Modifier.padding(vertical = 18.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.10f)))
 }
 
 /** A dim group label inside a popup ("PRESETS", "HEX CODE"). Passed in capitals; see [StageGroupLabel]. */

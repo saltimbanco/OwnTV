@@ -187,7 +187,7 @@ fun BackupScreen(
                         Modifier
                             .background(StageColors.Warn.copy(alpha = 0.1f), cardShape)
                             .border(1.5.mpx, StageColors.Warn.copy(alpha = 0.35f), cardShape)
-                    } else Modifier.background(Color.White.copy(alpha = 0.05f), cardShape),
+                    } else Modifier.background(StageColors.Ink.copy(alpha = 0.05f), cardShape),
                 )
                 .padding(24.mpx),
             horizontalArrangement = Arrangement.spacedBy(20.mpx),
@@ -218,7 +218,7 @@ fun BackupScreen(
                     )
                     Text(
                         listOfNotNull(
-                            tv.own.owntv.ui.format.formatBestDateTime(context, "dMMMyyyyjm", last.at),
+                            tv.own.owntv.ui.format.formatBestDateTime(context, "dMMMyyyy", last.at),
                             android.text.format.Formatter.formatShortFileSize(context, last.bytes),
                             if (last.encrypted) stringResource(R.string.more_pane_encrypted) else null,
                             last.path.takeIf { it.isNotBlank() },
@@ -640,6 +640,8 @@ internal fun SectionPickerDialog(
      * "Everything", which is about what the file holds, not about this device.
      */
     deviceSettings: MutableState<Boolean>? = null,
+    /** First-run restore: say so when Sources is unticked, because the device then has no playlists. */
+    warnWithoutSources: Boolean = false,
 ) {
     var selected by remember { mutableStateOf(initial) }
     val firstFocus = remember { FocusRequester() }
@@ -675,6 +677,14 @@ internal fun SectionPickerDialog(
                 desc = stringResource(R.string.settings_backup_device_settings_desc),
                 checked = deviceSettings.value,
                 onToggle = { deviceSettings.value = !deviceSettings.value },
+            )
+        }
+        if (warnWithoutSources && selected.isNotEmpty() && BackupManager.Section.SOURCES !in selected) {
+            Text(
+                stringResource(R.string.settings_backup_no_sources_warning),
+                style = stageText(17, 600),
+                color = StageColors.Warn,
+                modifier = Modifier.padding(top = 10.mpx),
             )
         }
     }

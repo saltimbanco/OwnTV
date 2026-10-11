@@ -94,6 +94,7 @@ Questions, ideas, bug reports — **join the OwnTV Telegram group:**
 
 ### 🎨 Look & robustness
 - Material 3 theming, your own accent and focus highlight, and an interaction-aware **Glass Effect**
+- **Dark and Light themes** (or follow the TV) across the whole app, the player included
 - Font sizing for the interface and for popups, independently
 - **Remote Shortcuts** — map spare colour, number, channel and media keys to 26 actions
 - **26 interface languages**, RTL-aware, chosen before anything else on a fresh install

@@ -1,5 +1,6 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.hudInk
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -83,7 +84,7 @@ fun LiveEpgCard(
                 Text(
                     entry.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
+                    color = hudInk,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -104,7 +105,7 @@ fun LiveEpgCard(
                         )
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = hudInk.copy(alpha = 0.5f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -117,7 +118,7 @@ fun LiveEpgCard(
                     Text(
                         synopsis,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.62f),
+                        color = hudInk.copy(alpha = 0.62f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp),
@@ -129,7 +130,7 @@ fun LiveEpgCard(
                     Spacer(Modifier.height(5.dp))
                     Box(
                         Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp))
-                            .background(Color.White.copy(alpha = 0.18f)),
+                            .background(hudInk.copy(alpha = 0.18f)),
                     ) {
                         Box(
                             Modifier.fillMaxWidth(progress).height(2.dp)
@@ -141,15 +142,15 @@ fun LiveEpgCard(
         }
         // Hairline separator, only when both halves are present.
         if (epg.now != null && epg.next != null) {
-            Box(Modifier.height(34.dp).widthIn(min = 1.dp, max = 1.dp).background(Color.White.copy(alpha = 0.18f)))
+            Box(Modifier.height(34.dp).widthIn(min = 1.dp, max = 1.dp).background(hudInk.copy(alpha = 0.18f)))
         }
         epg.next?.let { entry ->
             Column(Modifier.widthIn(max = 240.dp)) {
-                SlotLabel(stringResource(if (archive) R.string.content_archive_then else R.string.content_live_next), Color.White.copy(alpha = 0.45f))
+                SlotLabel(stringResource(if (archive) R.string.content_archive_then else R.string.content_live_next), hudInk.copy(alpha = 0.45f))
                 Text(
                     entry.title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.72f),
+                    color = hudInk.copy(alpha = 0.72f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -160,7 +161,7 @@ fun LiveEpgCard(
                         formatTime(entry.stopMs),
                     ),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.4f),
+                    color = hudInk.copy(alpha = 0.4f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -184,13 +185,13 @@ fun ZapGuideLines(epg: EpgNowNext?, modifier: Modifier = Modifier) {
     Column(modifier.padding(top = 8.dp)) {
         epg.now?.let { entry ->
             SlotLabel(stringResource(R.string.content_live_now), colors.primary)
-            Text(entry.title, style = MaterialTheme.typography.bodyMedium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(entry.title, style = MaterialTheme.typography.bodyMedium, color = hudInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val remaining = ((entry.stopMs - nowMs) / 60_000L).toInt()
             Text(
                 if (remaining in 1..600) stringResource(R.string.content_live_time_remaining, formatTime(entry.stopMs), remaining)
                 else stringResource(R.string.content_live_time_range, formatTime(entry.startMs), formatTime(entry.stopMs)),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.5f),
+                color = hudInk.copy(alpha = 0.5f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -198,19 +199,19 @@ fun ZapGuideLines(epg: EpgNowNext?, modifier: Modifier = Modifier) {
             if (span > 0f) {
                 val progress = ((nowMs - entry.startMs) / span).coerceIn(0f, 1f)
                 Spacer(Modifier.height(5.dp))
-                Box(Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.18f))) {
+                Box(Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)).background(hudInk.copy(alpha = 0.18f))) {
                     Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(1.dp)).background(colors.primary))
                 }
             }
         }
         epg.next?.let { entry ->
             Spacer(Modifier.height(8.dp))
-            SlotLabel(stringResource(R.string.content_live_next), Color.White.copy(alpha = 0.45f))
-            Text(entry.title, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            SlotLabel(stringResource(R.string.content_live_next), hudInk.copy(alpha = 0.45f))
+            Text(entry.title, style = MaterialTheme.typography.labelMedium, color = hudInk.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 stringResource(R.string.content_live_time_range, formatTime(entry.startMs), formatTime(entry.stopMs)),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.4f),
+                color = hudInk.copy(alpha = 0.4f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

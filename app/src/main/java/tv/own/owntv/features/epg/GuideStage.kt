@@ -1,5 +1,8 @@
 package tv.own.owntv.features.epg
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.stageShadow
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -114,10 +117,11 @@ internal fun GuideVideo(
     val playing = showVideo && previewState != tv.own.owntv.player.LivePreviewEngine.State.ERROR &&
         previewState != tv.own.owntv.player.LivePreviewEngine.State.IDLE
     val r = 28.mpx
+    val videoShadow = tv.own.owntv.ui.theme.stageShadow(0.55f)
     Box(
         modifier
             .aspectRatio(16f / 9f)
-            .drawBehind { drawBoxShadow(Color.Black.copy(alpha = 0.55f), 80.mpx.toPx(), r.toPx(), dy = 30.mpx.toPx()) }
+            .drawBehind { drawBoxShadow(videoShadow, 80.mpx.toPx(), r.toPx(), dy = 30.mpx.toPx()) }
             .clip(RoundedCornerShape(r))
             .background(Color.Black),
         contentAlignment = Alignment.Center,
@@ -194,7 +198,7 @@ internal fun GuideProgrammeBlock(
         if (details != null) Text(details, style = stageText(19, 400), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             synopsis.orEmpty(),
-            style = stageText(19, 400).copy(lineHeight = (19 * 1.5f).mpxSp), color = Color(0xFFCCD6D2),
+            style = stageText(19, 400).copy(lineHeight = (19 * 1.5f).mpxSp), color = stageTone(Color(0xFFCCD6D2), StageColors.Body),
             maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.widthIn(max = 1000.mpx).padding(top = 12.mpx, bottom = 20.mpx),
         )
@@ -290,7 +294,7 @@ internal fun Modifier.guideNowLine(accent: Color): Modifier = drawBehind {
 internal fun GuideMenuHost(x: Float, top: Dp, width: Dp, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     BackHandler { onDismiss() }
     OwnTVPopup(onDismissRequest = onDismiss, stageLayout = true) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)).longPressMenuGuard()) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(StageColors.Scrim).longPressMenuGuard()) {
             StageMenu(
                 Modifier
                     .padding(start = (maxWidth * (x / 1920f)).coerceAtMost(maxWidth - width), top = top, bottom = 24.mpx)
@@ -512,6 +516,8 @@ internal fun GuideOrderMenu(
     onPick: (SettingsRepository.GuideSort) -> Unit,
     showEmpty: Boolean,
     onShowEmpty: (Boolean) -> Unit,
+    showPreview: Boolean,
+    onShowPreview: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val focus = remember { FocusRequester() }
@@ -531,6 +537,11 @@ internal fun GuideOrderMenu(
             text = stringResource(R.string.content_epg_show_empty), icon = OwnTVIcon.EYE_OFF,
             value = stringResource(if (showEmpty) R.string.common_on else R.string.common_off),
             onClick = { onShowEmpty(!showEmpty); onDismiss() },
+        )
+        StageMenuItem(
+            text = stringResource(R.string.content_epg_show_preview), icon = OwnTVIcon.VIDEO,
+            value = stringResource(if (showPreview) R.string.common_on else R.string.common_off),
+            onClick = { onShowPreview(!showPreview); onDismiss() },
         )
     }
 }
@@ -674,7 +685,7 @@ internal fun GuideReviewPopup(
     var listFocused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { acceptFocus(0).requestFocus() } }
     OwnTVPopup(onDismissRequest = onDone, stageLayout = true) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f))) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(StageColors.Scrim)) {
             Column(
                 Modifier
                     .padding(start = maxWidth * (420f / 1920f), top = 150.mpx, bottom = 24.mpx)
@@ -786,11 +797,12 @@ private fun GuideReviewRow(
         Text(s.channel.name, style = stageText(20, 700), color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(300.mpx))
         Text("→", style = stageText(22, 400), color = StageColors.Dim)
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.mpx), verticalAlignment = Alignment.CenterVertically) {
-            Text(s.epgName ?: s.epgChannelId, style = stageText(18, 400), color = Color(0xFFD3DCD8), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Text(s.epgName ?: s.epgChannelId, style = stageText(18, 400), color = stageTone(Color(0xFFD3DCD8), StageColors.Body), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             Text(
                 stringResource(R.string.common_percent, (s.score * 100).toInt()),
-                style = stageText(15, 800), color = Color(0xFFFFD27A), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.background(Color(255, 200, 80).copy(alpha = 0.14f), RoundedCornerShape(8.mpx)).padding(horizontal = 9.mpx, vertical = 4.mpx),
+                style = stageText(15, 800), color = LocalStagePalette.current.chipWarnText, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.background(LocalStagePalette.current.chipWarnFill, RoundedCornerShape(8.mpx))
+.padding(horizontal = 9.mpx, vertical = 4.mpx),
             )
         }
         StageTool(text = stringResource(R.string.content_epg_accept), icon = OwnTVIcon.CHECK, onClick = onAccept, modifier = Modifier.focusRequester(acceptFocus))
@@ -826,7 +838,7 @@ internal fun ReminderPrompt(
     BackHandler { onDismiss() }
     val eyebrow = reminderEyebrow(reminder)
     OwnTVPopup(onDismissRequest = onDismiss, stageLayout = true) {
-        Box(Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().background(StageColors.Scrim), contentAlignment = Alignment.Center) {
             Column(
                 Modifier
                     .width(760.mpx)

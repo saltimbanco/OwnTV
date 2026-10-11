@@ -42,6 +42,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.stage.StagePill
 import tv.own.owntv.ui.theme.StageColors
+import tv.own.owntv.ui.theme.LocalStagePalette
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.mpxSp
 import tv.own.owntv.ui.theme.stageText
@@ -142,13 +143,28 @@ fun StageClock(weatherInfo: WeatherInfo?, fahrenheit: Boolean, colors: ClockColo
     // The mockup lifts the cluster's text off any backdrop with a soft black shadow. The TV cuts a text
     // shadow's blur off at the line's bounds, so a wide one showed as a dark box behind each line over a
     // bright backdrop: the shadow stays tight, and a soft oval glow behind the whole block does the lifting.
-    val shadow = with(LocalDensity.current) { Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 1.mpx.toPx()), 3.mpx.toPx()) }
+    // Light (`.mine.light .status`): no shadow and no dark glow; the block sits on a small white chip
+    // instead (white 74%, ink 7% rim), drawn outside its bounds so the layout is the same as in dark.
+    val light = LocalStagePalette.current.isLight
+    val rim = StageColors.Ink.copy(alpha = 0.07f)
+    val shadow = if (light) null else with(LocalDensity.current) { Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 1.mpx.toPx()), 3.mpx.toPx()) }
     Column(
         horizontalAlignment = Alignment.End,
         // Unclipped (the GradientTextures glows clip to the node, which drew a hard box); a few hundred
         // pixels, so a brush is fine here. Drawn as a circle squashed to an oval around the block.
         modifier = Modifier.drawBehind {
+            if (light) {
+                val dx = 16.mpx.toPx()
+                val dy = 10.mpx.toPx()
+                val cr = androidx.compose.ui.geometry.CornerRadius(18.mpx.toPx())
+                val tl = Offset(-dx, -dy)
+                val sz = androidx.compose.ui.geometry.Size(size.width + 2 * dx, size.height + 2 * dy)
+                drawRoundRect(Color.White.copy(alpha = 0.74f), tl, sz, cr)
+                drawRoundRect(rim, tl, sz, cr, style = androidx.compose.ui.graphics.drawscope.Stroke(1.mpx.toPx()))
+                return@drawBehind
+            }
             val r = size.height * 1.2f
+
             scale(scaleX = (size.width * 0.8f) / r, scaleY = 1f, pivot = center) {
                 drawCircle(
                     Brush.radialGradient(

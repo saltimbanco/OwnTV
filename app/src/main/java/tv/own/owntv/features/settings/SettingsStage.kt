@@ -1,5 +1,7 @@
 package tv.own.owntv.features.settings
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -353,7 +355,7 @@ private fun SettingPanelBody(help: SettingHelp) {
     Text(help.text, style = stageText(17, 500).copy(lineHeight = 27.mpxSpLine()), color = PanelText)
     help.extra?.invoke()
     if (help.choices.isNotEmpty()) {
-        Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+        Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
         SettingPanelHeading(stringResource(R.string.settings_panel_choices))
         val a = stageAccent
         help.choices.forEachIndexed { i, label ->
@@ -397,7 +399,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.SettingPanelEditor(ed
     androidx.activity.compose.BackHandler { editor.onDismiss() }
     if (help != null && help.title.isNotEmpty()) SettingPanelHeading(help.title)
     if (help != null) Text(help.text, style = stageText(17, 500).copy(lineHeight = 27.mpxSpLine()), color = PanelText, maxLines = 3, overflow = TextOverflow.Ellipsis)
-    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
     editor.content(this, help)
 }
 
@@ -566,7 +568,7 @@ fun PopupSizeSample(sizePercent: Int) {
     }
 }
 
-private val PanelText = Color(0xFFD3DCD8)
+private val PanelText: Color @Composable get() = stageTone(Color(0xFFD3DCD8), StageColors.Body)
 
 /** A "label  value" line in the panel (OpenSubtitles' account details). */
 @Composable
@@ -581,11 +583,12 @@ fun SettingPanelLine(label: String, value: String) {
 @Composable
 fun StageRadio(on: Boolean) {
     val a = stageAccent
+    val dim = StageColors.Dim
     Box(
         Modifier.size(22.mpx).drawBehind {
             val r = size.minDimension / 2f
             val ring = (if (on) 7 else 2) * 1.mpx.toPx()
-            drawCircle(if (on) a.accent else StageColors.Dim, radius = r - ring / 2f, style = androidx.compose.ui.graphics.drawscope.Stroke(ring))
+            drawCircle(if (on) a.accent else dim, radius = r - ring / 2f, style = androidx.compose.ui.graphics.drawscope.Stroke(ring))
         },
     )
 }
@@ -609,7 +612,7 @@ fun StageSettingsHeading(text: String, count: Int?, first: Boolean = false) {
     }
 }
 
-private val HeadingCount = Color(0xFF4D5955)
+private val HeadingCount: Color @Composable get() = stageTone(Color(0xFF4D5955), Color(0xFFA3AEA9))
 
 /**
  * `.srow`: 84 high, radius 20, padding 0 22, gap 18 — a 24 px muted icon, the title 21/700 over a
@@ -700,7 +703,7 @@ fun StageSettingRow(
     }
 }
 
-private val FocusedDesc = Color(0xFFD9E6E1)
+private val FocusedDesc: Color @Composable get() = StageColors.FxLine
 
 @Composable
 private fun SettingValueView(value: SettingValue) {
@@ -746,7 +749,7 @@ private fun SegmentedDisplay(options: List<String>, selected: Int) {
             Box(
                 Modifier
                     .height(40.mpx)
-                    .then(if (on) Modifier.background(Color.White.copy(alpha = 0.13f), RoundedCornerShape(11.mpx)) else Modifier)
+                    .then(if (on) Modifier.background(LocalStagePalette.current.segmentOn, RoundedCornerShape(11.mpx)) else Modifier)
                     .padding(horizontal = 14.mpx),
                 contentAlignment = Alignment.Center,
             ) {
@@ -999,12 +1002,22 @@ fun StageFieldRow(
                         textStyle = stageText(15.5f, 500).copy(color = if (focused || editing) FocusedDesc else StageColors.Text),
                         singleLine = true,
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(a.accent),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                        // A password row gets the password keyboard: the text one auto-corrects and
+                        // capitalises, which turned a correct backup password into a wrong one.
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = if (password && keyboardType == androidx.compose.ui.text.input.KeyboardType.Text) androidx.compose.ui.text.input.KeyboardType.Password else keyboardType,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                            autoCorrectEnabled = if (password) false else null,
+                        ),
                         keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { stop() }),
                         visualTransformation = if (password && !shown) androidx.compose.ui.text.input.PasswordVisualTransformation()
                             else androidx.compose.ui.text.input.VisualTransformation.None,
                     )
                 }
+            }
+            // Without a settings panel (the setup wizard) nothing else tells the user ▶ shows the password.
+            if (password && lit && !editing && panel == null) {
+                Text("▶ " + stringResource(if (shown) R.string.common_hide else R.string.common_show), style = stageText(18, 700), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (lit && !editing) Text(stringResource(R.string.common_edit), style = stageText(18, 700), color = a.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -1068,7 +1081,7 @@ fun StageActionColumn(actions: List<StageAction>, back: FocusRequester?, first: 
 /** The panel's SPAN / MULTI-SELECT block (P10B, owner): how a span is picked, and the CH keys that reach its end. */
 @Composable
 fun SpanHelpBlock() {
-    Box(Modifier.padding(top = 18.mpx, bottom = 14.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+    Box(Modifier.padding(top = 18.mpx, bottom = 14.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
     SettingPanelHeading(stringResource(R.string.settings_span_heading))
     Text(stringResource(R.string.settings_span_help), style = stageText(15, 500), color = StageColors.Muted)
     Text(stringResource(R.string.settings_span_ch_help), style = stageText(15, 500), color = StageColors.Muted, modifier = Modifier.padding(top = 6.mpx))

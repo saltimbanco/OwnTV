@@ -211,7 +211,7 @@ fun MetadataSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     }
                     Text(stringResource(R.string.settings_metadata_fair_share), style = stageText(15, 500), color = StageColors.Muted, modifier = Modifier.padding(top = 6.mpx))
                 }
-                Box(Modifier.padding(top = 18.mpx, bottom = 18.mpx).fillMaxWidth().height(1.mpx).background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)))
+                Box(Modifier.padding(top = 18.mpx, bottom = 18.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
             }
         } else null,
     ) {

@@ -1,5 +1,7 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.hudShade
+import tv.own.owntv.ui.theme.hudInk
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -60,8 +62,8 @@ internal fun PlayerClock(watchingMs: Long?, modifier: Modifier = Modifier) {
     Row(
         modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.Black.copy(alpha = 0.38f))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+            .background(hudShade(0.38f))
+            .border(1.dp, hudInk.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
             .padding(horizontal = 14.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -76,15 +78,15 @@ internal fun PlayerClock(watchingMs: Long?, modifier: Modifier = Modifier) {
                 dateColor = colors.primary.copy(alpha = 0.7f),
             )
             // Hairline between the two, exactly like the guide card's own divider.
-            Box(Modifier.height(38.dp).width(1.dp).background(Color.White.copy(alpha = 0.18f)))
+            Box(Modifier.height(38.dp).width(1.dp).background(hudInk.copy(alpha = 0.18f)))
         }
         ClockColumn(
             label = stringResource(R.string.content_clock_current),
             time = formatTime(nowMs),
             date = formatDate(nowMs),
-            labelColor = Color.White.copy(alpha = 0.45f),
-            timeColor = Color.White,
-            dateColor = Color.White.copy(alpha = 0.45f),
+            labelColor = hudInk.copy(alpha = 0.45f),
+            timeColor = hudInk,
+            dateColor = hudInk.copy(alpha = 0.45f),
         )
     }
 }

@@ -1,5 +1,7 @@
 package tv.own.owntv.features.search
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.stageShadow
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -64,12 +66,14 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import tv.own.owntv.R
 import tv.own.owntv.core.content.SearchIntent
+import tv.own.owntv.core.content.ProgrammeSearchResult
 import tv.own.owntv.core.content.SearchResults
 import tv.own.owntv.core.database.dao.ChannelSearchResult
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.database.entity.MovieEntity
 import tv.own.owntv.core.database.entity.SeriesEntity
 import tv.own.owntv.core.epg.displayLogoUrl
+import tv.own.owntv.core.metadata.HeadlineTitle
 import tv.own.owntv.features.live.LivePlate
 import tv.own.owntv.features.live.LiveStagePane
 import tv.own.owntv.features.live.LiveViewModel
@@ -103,6 +107,7 @@ import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.mpxSp
 import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
+import tv.own.owntv.ui.format.rememberSystemTimeFormatter
 
 @Composable
 private fun SearchIntent.displayLabel(): String = stringResource(
@@ -119,6 +124,9 @@ private sealed interface Entry {    val key: String
     data class Channel(val row: ChannelSearchResult) : Entry { override val key = "c${row.channel.id}" }
     data class Movie(val movie: MovieEntity) : Entry { override val key = "m${movie.id}" }
     data class Series(val series: SeriesEntity) : Entry { override val key = "s${series.id}" }
+    data class Programme(val found: ProgrammeSearchResult) : Entry {
+        override val key = "p${found.programme.id}-${found.channel.id}"
+    }
     data class AllChannels(val count: Int) : Entry { override val key = "all-channels" }
 }
 
@@ -190,7 +198,7 @@ fun SearchScreen(
     // a channel is the first result under the field.
     var listHasFocus by remember { mutableStateOf(false) }
     var scheduleHasFocus by remember { mutableStateOf(false) }
-    val activeChannel = (active as? Entry.Channel)?.row?.channel?.takeIf { showingResults && (listHasFocus || scheduleHasFocus) }
+    val activeChannel = active?.channel()?.takeIf { showingResults && (listHasFocus || scheduleHasFocus) }
     val previewOn = previewEnabled && livePreviewSetting
 
     // A channel shows Live TV's preview: the same guide lookup, and the same 700 ms settle before playing.
@@ -207,6 +215,7 @@ fun SearchScreen(
     }
     // The "now on" part of a channel row's line (the cache the Live TV list fills).
     val channelRows = shown.channels.map { it.channel }
+    val formatTime = rememberSystemTimeFormatter()
     LaunchedEffect(channelRows.map { it.id }) { liveVm.ensureNowPlaying(channelRows) }
 
     // Back clears an active query/intent (returning to the launcher) before leaving the screen.
@@ -248,6 +257,7 @@ fun SearchScreen(
         vm.rememberCurrentQuery()
         when (e) {
             is Entry.Channel -> onGoToChannel(e.row.channel)
+            is Entry.Programme -> onGoToChannel(e.found.channel)
             is Entry.Movie -> onGoToMovie(e.movie)
             is Entry.Series -> onOpenSeries(e.series)
             else -> Unit
@@ -265,7 +275,7 @@ fun SearchScreen(
         // Title band: "Search" + "“sky” · 12 results" (SR-01).
         val titleModifier = Modifier.padding(start = fx(84), top = 52.mpx).width(fx(826))
         if (showingResults) {
-            val total = shown.channels.size + shown.movies.size + shown.series.size
+            val total = shown.channels.size + shown.movies.size + shown.series.size + shown.programmes.size
             VodHeader(
                 section = stringResource(R.string.search_title),
                 category = if (searching) stringResource(R.string.search_query_quoted, query.trim()) else intent?.displayLabel().orEmpty(),
@@ -310,8 +320,8 @@ fun SearchScreen(
             // Tabs (SR-01): the focused tab is the open one, so ◀ ▶ change it.
             Row(Modifier.padding(start = fx(84) - 12.mpx, top = 192.mpx), horizontalArrangement = Arrangement.spacedBy(16.mpx)) {
                 listOf(
-                    Triple(SearchTab.ALL, stringResource(R.string.settings_customize_filter_all), results.channels.size + results.movies.size + results.series.size),
-                    Triple(SearchTab.LIVE, stringResource(R.string.common_nav_live_tv), results.channels.size),
+                    Triple(SearchTab.ALL, stringResource(R.string.settings_customize_filter_all), results.channels.size + results.movies.size + results.series.size + results.programmes.size),
+                    Triple(SearchTab.LIVE, stringResource(R.string.common_nav_live_tv), results.channels.size + results.programmes.size),
                     Triple(SearchTab.MOVIES, stringResource(R.string.common_nav_movies), results.movies.size),
                     Triple(SearchTab.SERIES, stringResource(R.string.common_nav_series), results.series.size),
                 ).forEach { (t, label, n) ->
@@ -393,6 +403,21 @@ fun SearchScreen(
                                 },
                             )
                         }
+                        is Entry.Programme -> {
+                            val ch = e.found.channel
+                            val p = e.found.programme
+                            SearchRow(
+                                title = p.title,
+                                line = AnnotatedString(
+                                    ProviderTags.parse(ch.name).name + sep +
+                                        stringResource(R.string.content_live_time_range_plain, formatTime(p.startMs), formatTime(p.stopMs)),
+                                ),
+                                tags = emptyList(), mark = marks[ch.sourceId],
+                                onClick = { goTo(e) },
+                                leading = { LivePlate(ch.displayLogoUrl, 76.mpx, 54.mpx) },
+                                modifier = rowModifier,
+                            )
+                        }
                         is Entry.Movie -> SearchRow(
                             title = e.movie.name,
                             line = vodRowLine(e.movie.year, e.movie.rating, e.movie.categoryId?.let { categoryNames[it] }),
@@ -415,10 +440,11 @@ fun SearchScreen(
 
             // The right side, in one slot (x 944, w 912): Live TV's preview pane or the poster panel.
             val panelModifier = Modifier.padding(start = panelX, top = 120.mpx).width(panelW)
-            when (active) {
-                is Entry.Channel -> LiveStagePane(
-                    channel = active.row.channel,
-                    channelName = ProviderTags.parse(active.row.channel.name).name,
+            val activeCh = active?.channel()
+            when {
+                activeCh != null -> LiveStagePane(
+                    channel = activeCh,
+                    channelName = ProviderTags.parse(activeCh.name).name,
                     nowNext = nowNext,
                     previewEngine = liveVm.previewEngine,
                     showVideo = previewOn,
@@ -429,11 +455,11 @@ fun SearchScreen(
                     onBackToList = { runCatching { requesterFor(active.key).requestFocus() } },
                     modifier = panelModifier.onFocusChanged { scheduleHasFocus = it.hasFocus },
                 )
-                is Entry.Movie -> PosterPanel(
+                active is Entry.Movie -> PosterPanel(
                     movieTitleInfo(active.movie, focusedMeta?.takeIf { it.first == active.key }?.second, metadataMode.tmdbWins),
                     series = false, modifier = panelModifier,
                 )
-                is Entry.Series -> PosterPanel(
+                active is Entry.Series -> PosterPanel(
                     seriesTitleInfo(active.series, focusedMeta?.takeIf { it.first == active.key }?.second, metadataMode.tmdbWins),
                     series = true, modifier = panelModifier,
                 )
@@ -447,13 +473,13 @@ fun SearchScreen(
                 add(
                     stringResource(R.string.common_ok) to stringResource(
                         when (active) {
-                            is Entry.Channel -> R.string.search_go_to_channel
+                            is Entry.Channel, is Entry.Programme -> R.string.search_go_to_channel
                             is Entry.Series -> R.string.search_open_series
                             else -> R.string.search_go_to_movie
                         },
                     ),
                 )
-                if (active is Entry.Channel) add("▶" to stringResource(R.string.content_key_schedule))
+                if (active?.channel() != null) add("▶" to stringResource(R.string.content_key_schedule))
             }
             if (showingResults) {
                 add("▲" to stringResource(R.string.common_search))
@@ -467,7 +493,14 @@ fun SearchScreen(
     }
 }
 
-private fun Entry.isResult() = this is Entry.Channel || this is Entry.Movie || this is Entry.Series
+private fun Entry.isResult() = this is Entry.Channel || this is Entry.Programme || this is Entry.Movie || this is Entry.Series
+
+/** The channel a row is about — its own, or the one showing the programme. */
+private fun Entry.channel(): ChannelEntity? = when (this) {
+    is Entry.Channel -> row.channel
+    is Entry.Programme -> found.channel
+    else -> null
+}
 
 /** The rows in display order for [tab]; All groups them under headings (SR-01). */
 @Composable
@@ -475,12 +508,13 @@ private fun searchEntries(results: SearchResults, tab: SearchTab, capChannels: B
     val live = stringResource(R.string.common_nav_live_tv)
     val movies = stringResource(R.string.common_nav_movies)
     val series = stringResource(R.string.common_nav_series)
+    val onTv = stringResource(R.string.search_on_tv)
     val sep = dotSeparator()
-    return remember(results, tab, capChannels, live, movies, series, sep) {
+    return remember(results, tab, capChannels, live, movies, series, onTv, sep) {
         val locale = java.util.Locale.getDefault()
         fun heading(label: String, n: Int, key: String) = Entry.Heading(label.uppercase(locale) + sep + n.toString(), key)
         when (tab) {
-            SearchTab.LIVE -> results.channels.map { Entry.Channel(it) }
+            SearchTab.LIVE -> results.channels.map { Entry.Channel(it) } + results.programmes.map { Entry.Programme(it) }
             SearchTab.MOVIES -> results.movies.map { Entry.Movie(it) }
             SearchTab.SERIES -> results.series.map { Entry.Series(it) }
             SearchTab.ALL -> buildList {
@@ -489,6 +523,10 @@ private fun searchEntries(results: SearchResults, tab: SearchTab, capChannels: B
                     val cap = capChannels && results.channels.size > ALL_TAB_CHANNELS
                     (if (cap) results.channels.take(ALL_TAB_CHANNELS) else results.channels).forEach { add(Entry.Channel(it)) }
                     if (cap) add(Entry.AllChannels(results.channels.size))
+                }
+                if (results.programmes.isNotEmpty()) {
+                    add(heading(onTv, results.programmes.size, "h-ontv"))
+                    results.programmes.forEach { add(Entry.Programme(it)) }
                 }
                 if (results.movies.isNotEmpty()) {
                     add(heading(movies, results.movies.size, "h-movies"))
@@ -545,9 +583,9 @@ private fun SearchRow(
     StageRow(onClick = onClick, onLongClick = {}, height = 84.mpx, horizontalPadding = 18.mpx, gap = 18.mpx, modifier = modifier.fillMaxWidth()) { focused ->
         leading()
         Column(Modifier.weight(1f)) {
-            Text(title, style = stageText(21, 700), color = if (focused) Color.White else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = stageText(21, 700), color = if (focused) StageColors.FxText else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(4.mpx))
-            Text(line, style = stageText(16, 400), color = if (focused) Color(0xFFD9E6E1) else StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(line, style = stageText(16, 400), color = if (focused) StageColors.FxLine else StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.mpx), verticalAlignment = Alignment.CenterVertically) {
             tags.forEach { StageTag(it) }
@@ -559,7 +597,7 @@ private fun SearchRow(
 /** A result's poster, 50 × 74, radius 8. */
 @Composable
 private fun SmallPoster(url: String?, placeholder: OwnTVIcon) {
-    Box(Modifier.size(50.mpx, 74.mpx).clip(RoundedCornerShape(8.mpx)).background(Color.White.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(50.mpx, 74.mpx).clip(RoundedCornerShape(8.mpx)).background(StageColors.Ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
         if (!url.isNullOrBlank()) AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         else OwnTVIcon(placeholder, StageColors.Dim, Modifier.size(22.mpx))
     }
@@ -573,12 +611,13 @@ private fun SmallPoster(url: String?, placeholder: OwnTVIcon) {
 @Composable
 private fun PosterPanel(info: VodTitleInfo, series: Boolean, modifier: Modifier = Modifier) {
     val videoR = 28.mpx
+    val videoShadow = tv.own.owntv.ui.theme.stageShadow(0.55f)
     Column(modifier) {
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .drawBehind { drawBoxShadow(Color.Black.copy(alpha = 0.55f), 80.mpx.toPx(), videoR.toPx(), dy = 30.mpx.toPx()) }
+                .drawBehind { drawBoxShadow(videoShadow, 80.mpx.toPx(), videoR.toPx(), dy = 30.mpx.toPx()) }
                 .clip(RoundedCornerShape(videoR))
                 .background(Color.Black),
         ) {
@@ -617,7 +656,7 @@ private fun PosterPanel(info: VodTitleInfo, series: Boolean, modifier: Modifier 
                 )
             } else {
                 Text(
-                    info.title, style = stageText(44, 800, (-1).mpxSp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    HeadlineTitle.of(info.title), style = stageText(44, 800, (-1).mpxSp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.align(Alignment.BottomStart).padding(start = 26.mpx, bottom = 20.mpx, end = 26.mpx),
                 )
             }
@@ -629,7 +668,7 @@ private fun PosterPanel(info: VodTitleInfo, series: Boolean, modifier: Modifier 
             )
             info.plot?.takeIf { it.isNotBlank() }?.let {
                 Text(
-                    it, style = stageText(19, 400).copy(lineHeight = (19 * 1.55f).mpxSp), color = Color(0xFFCCD6D2),
+                    it, style = stageText(19, 400).copy(lineHeight = (19 * 1.55f).mpxSp), color = stageTone(Color(0xFFCCD6D2), StageColors.Body),
                     maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 18.mpx, bottom = 22.mpx),
                 )
             }
@@ -688,7 +727,7 @@ private fun RecentRow(term: String, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OwnTVIcon(OwnTVIcon.HISTORY, if (focused) a.onAccent else StageColors.Muted, Modifier.size(20.mpx))
-            Text(term, style = stageText(18.5f, 600), color = if (focused) a.onAccent else Color(0xFFCDD7D3), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(term, style = stageText(18.5f, 600), color = if (focused) a.onAccent else stageTone(Color(0xFFCDD7D3), StageColors.ItemText), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

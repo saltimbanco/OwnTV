@@ -139,7 +139,7 @@ private fun StepDots(current: WizardStep, modifier: Modifier) {
                 Box(
                     Modifier
                         .size(width = if (on) 26.mpx else 10.mpx, height = 10.mpx)
-                        .background(if (reached) a.accent else Color.White.copy(alpha = 0.18f), RoundedCornerShape(5.mpx)),
+                        .background(if (reached) a.accent else StageColors.Ink.copy(alpha = 0.18f), RoundedCornerShape(5.mpx)),
                 )
                 if (on) Text(stringResource(s.labelRes), style = stageText(15, 700), color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -167,7 +167,7 @@ internal fun WizardCards(cards: List<WizardCard>, firstFocus: FocusRequester? = 
                 onClick = card.onClick,
                 radius = 22.mpx,
                 focusStyle = StageFocus.FX,
-                idle = Modifier.background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(22.mpx)),
+                idle = Modifier.background(StageColors.Ink.copy(alpha = 0.05f), RoundedCornerShape(22.mpx)),
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 170.mpx)

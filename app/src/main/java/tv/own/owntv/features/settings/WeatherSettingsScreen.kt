@@ -194,7 +194,7 @@ private fun ClockPreview(colors: ClockColors) {
         Modifier
             .padding(top = 20.mpx)
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
+            .background(StageColors.Ink.copy(alpha = 0.04f), RoundedCornerShape(18.mpx))
             .padding(20.mpx),
         contentAlignment = Alignment.CenterEnd,
     ) { StageClock(weather, fahrenheit, colors) }
@@ -219,7 +219,7 @@ private val ClockPart.icon: OwnTVIcon get() = when (this) {
 }
 
 /** The shipped colour of each part: white time, grey date and weather. */
-private val ClockPart.default: Color get() = if (this == ClockPart.TIME) StageColors.Text else StageColors.Muted
+private val ClockPart.default: Color @Composable @androidx.compose.runtime.ReadOnlyComposable get() = if (this == ClockPart.TIME) StageColors.Text else StageColors.Muted
 
 private fun Color.hex(): String = String.format("#%06X", toArgb() and 0xFFFFFF)
 

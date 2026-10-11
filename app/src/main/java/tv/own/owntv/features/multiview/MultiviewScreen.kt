@@ -1,5 +1,7 @@
 package tv.own.owntv.features.multiview
 
+import tv.own.owntv.ui.theme.hudShade
+import tv.own.owntv.ui.theme.hudInk
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -320,7 +322,7 @@ private fun androidx.compose.foundation.layout.BoxScope.TileCaption(name: String
             .align(Alignment.BottomStart)
             .padding(10.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.Black.copy(alpha = 0.55f))
+            .background(hudShade(0.55f))
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -337,7 +339,7 @@ private fun androidx.compose.foundation.layout.BoxScope.TileCaption(name: String
         Text(
             text = name,
             style = MaterialTheme.typography.labelLarge,
-            color = Color.White,
+            color = hudInk,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

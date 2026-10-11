@@ -1,5 +1,7 @@
 package tv.own.owntv.player
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -296,6 +298,7 @@ fun AudioNowPlayingBar(
             // The progress hairline along the card's bottom edge (recordings only), inset 22.
             if (hasTime) {
                 val lineColor = accent.accent
+                val track = StageColors.Ink.copy(alpha = 0.12f)
                 Box(
                     Modifier.matchParentSize().drawBehind {
                         val inset = 22.mpx.toPx()
@@ -304,7 +307,7 @@ fun AudioNowPlayingBar(
                         val frac = (positionState.value.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
                         val top = size.height - h
                         val corner = CornerRadius(2.mpx.toPx())
-                        drawRoundRect(Color.White.copy(alpha = 0.12f), Offset(inset, top), Size(w, h), corner)
+                        drawRoundRect(track, Offset(inset, top), Size(w, h), corner)
                         val x = if (layoutDirection == LayoutDirection.Rtl) inset + w * (1 - frac) else inset
                         drawRoundRect(lineColor, Offset(x, top), Size(w * frac, h), corner)
                     },
@@ -444,7 +447,8 @@ private fun AudioBtn(
             .focusRequester(requesters[slot])
             .onFocusChanged { if (it.isFocused) onFocused(slot) }
             .focusProperties { canFocus = focusable && enabled },
-        idle = if (big) Modifier.background(Color.White.copy(alpha = 0.10f), CircleShape) else Modifier,
+        // `.audc .ab.big`: ink 10% (8% in light).
+        idle = if (big) Modifier.background(StageColors.Ink.copy(alpha = if (LocalStagePalette.current.isLight) 0.08f else 0.10f), CircleShape) else Modifier,
         contentAlignment = Alignment.Center,
     ) { focused ->
         OwnTVIcon(
@@ -452,7 +456,7 @@ private fun AudioBtn(
             tint = when {
                 focused -> a.onAccent
                 favorite -> colors.favorite
-                else -> Color(0xFFE6EEEA)
+                else -> stageTone(Color(0xFFE6EEEA), StageColors.ItemText)
             },
             filled = favorite || icon == OwnTVIcon.PLAY,
             modifier = Modifier.size(if (big) 24.mpx else 21.mpx),

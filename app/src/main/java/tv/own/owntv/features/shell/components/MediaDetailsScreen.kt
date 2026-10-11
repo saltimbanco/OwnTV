@@ -1,5 +1,7 @@
 package tv.own.owntv.features.shell.components
 
+import tv.own.owntv.ui.theme.stageTone
+import tv.own.owntv.ui.theme.LocalStagePalette
 import androidx.compose.runtime.Immutable
 
 import androidx.compose.foundation.background
@@ -95,7 +97,7 @@ fun MediaDetailsScreen(details: MediaDetailsUi, onExit: () -> Unit, modifier: Mo
             else -> false
         }
     }
-    val page = Color(0xFF070B0E)
+    val page = stageTone(Color(0xFF070B0E), LocalStagePalette.current.page)
     tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = onExit, stageLayout = true, stageScaled = false) {
         LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { focus.requestFocus() } }
         Box(modifier.fillMaxSize().background(page).trapAllFocusExit()) {
@@ -173,7 +175,7 @@ private fun CastGrid(cast: List<tv.own.owntv.core.metadata.CastMember>) {
             Column(Modifier.width(132.mpx), horizontalAlignment = Alignment.CenterHorizontally) {
                 val photo = tv.own.owntv.core.metadata.MetadataImages.profile(member.profilePath)
                 Box(
-                    Modifier.size(112.mpx).clip(RoundedCornerShape(56.mpx)).background(Color.White.copy(alpha = 0.06f)),
+                    Modifier.size(112.mpx).clip(RoundedCornerShape(56.mpx)).background(StageColors.Ink.copy(alpha = 0.06f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (photo != null) {

@@ -237,7 +237,7 @@ private fun LanguageStageRow(
 private fun TranslateBlock() {
     val url = SupportedLocales.CONTRIBUTION_PROJECT_URL
     val qr = remember(url) { CompanionLink.renderQr(url) }
-    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+    Box(Modifier.padding(top = 22.mpx, bottom = 16.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
     SettingPanelHeading(stringResource(R.string.settings_language_help_translate))
     Row(horizontalArrangement = Arrangement.spacedBy(20.mpx), verticalAlignment = Alignment.CenterVertically) {
         if (qr != null) {

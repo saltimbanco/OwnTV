@@ -47,6 +47,9 @@ import androidx.paging.map
 import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.features.customize.MoveTarget
+import tv.own.owntv.features.customize.CategoryRestorePlan
+import tv.own.owntv.features.customize.planCategoryRestore
+import tv.own.owntv.features.customize.restoreCategoryToDefault
 import tv.own.owntv.core.epg.CatchupUrl
 import tv.own.owntv.core.live.StreamGrant
 import tv.own.owntv.core.recording.RecordingSchedule
@@ -189,6 +192,35 @@ class LiveViewModel(
             // The programme is only known for the channel the guide pane is showing; from the list
             // this is a channel like any other, so its own now-programme is looked up here.
             startRecordingNow(channel, pid, epgReader.nowNext(channel, custom.value, epgOffset.value)?.now)
+        }
+    }
+
+    /** Channels with a recording running right now, so their menu offers Stop instead of Record. */
+    val recordingChannelIds: StateFlow<Set<Long>> = recordings.observeRunning()
+        .map { rows -> rows.mapTo(HashSet()) { it.channelId } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** Stop the running recording(s) of this channel, keeping what was captured. */
+    fun stopRecordingOn(channel: ChannelEntity) {
+        viewModelScope.launch {
+            recordings.observeRunning().first().filter { it.channelId == channel.id }.forEach { row ->
+                recordings.stop(row)
+                if (_playerRecording.value?.id == row.id) _playerRecording.value = null
+            }
+        }
+    }
+
+    /** What already claims this channel's playlist over the window — the clash the dialog warns about. */
+    suspend fun recordingClashes(channel: ChannelEntity, startMs: Long, stopMs: Long): List<tv.own.owntv.core.database.entity.RecordingEntity> {
+        val window = RecordingSchedule.manualWindow(startMs, stopMs, System.currentTimeMillis()) ?: return emptyList()
+        return recordings.clashesWith(channel.sourceId, window.first, window.last)
+    }
+
+    /** Record [channel] between two picked times (#2); [onScheduled] gets the start once it is saved. */
+    fun scheduleRecording(channel: ChannelEntity, startMs: Long, stopMs: Long, onScheduled: (Long) -> Unit) {
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            recordings.scheduleManual(pid, channel, startMs, stopMs)?.let { onScheduled(it.programmeStartMs) }
         }
     }
 
@@ -656,6 +688,35 @@ class LiveViewModel(
         }
     }
 
+    /** The content_order / movedFromOrigin context behind a rail key, or null for All / Favorites / History. */
+    private fun categoryContextKey(key: LiveKey): String? = when (key) {
+        is LiveKey.Folder -> folderContextKeys.value[key.id]
+        is LiveKey.Custom -> key.id
+        else -> null
+    }
+
+    /** What restoring [key]'s category to the playlist default would undo (empty when nothing). */
+    suspend fun categoryRestorePlan(key: LiveKey): CategoryRestorePlan {
+        val contextKey = categoryContextKey(key) ?: return CategoryRestorePlan()
+        val pid = currentProfileId() ?: return CategoryRestorePlan()
+        return planCategoryRestore(customize, contentOrderDao, pid, MediaType.LIVE, contextKey, customCategoryDao) {
+            when (key) {
+                is LiveKey.Folder -> channelDao.snapshotByCategoryManual(key.id, pid, contextKey, Int.MAX_VALUE)
+                    .mapTo(HashSet()) { CustomizeKeys.channel(it) }
+                else -> customCategoryDao.stableItemKeys(pid, contextKey).toSet()
+            }
+        }
+    }
+
+    /** Back to the playlist's order and contents (see [restoreCategoryToDefault]). */
+    fun restoreCategory(key: LiveKey) {
+        val contextKey = categoryContextKey(key) ?: return
+        viewModelScope.launch {
+            val pid = currentProfileId() ?: return@launch
+            restoreCategoryToDefault(customize, contentOrderDao, pid, MediaType.LIVE, contextKey, categoryRestorePlan(key))
+        }
+    }
+
     fun enterCategoryMoveMode(key: LiveKey) {
         if (key !is LiveKey.Folder && key !is LiveKey.Custom) return
         viewModelScope.launch {
@@ -1014,10 +1075,32 @@ class LiveViewModel(
             is LiveKey.Folder -> zapList.armForCategory(key.id, close)
             is LiveKey.Custom -> {
                 val title = browserCategories.value.firstOrNull { it.first == key }?.second.orEmpty()
-                zapList.armForCustom(key, title, { channelsInCustom(key) }, close)
+                zapList.armForKey(key, title, { channelsInCustom(key) }, close)
             }
-            else -> Unit
+            LiveKey.Favorites, LiveKey.History, LiveKey.Catchup, LiveKey.All ->
+                zapList.armForKey(key, null, { channelsInRail(key) }, close)
         }
+    }
+
+    /** A built-in rail for the in-player category sheet, bounded like every zap list and with the hide /
+     *  rename treatment the browsing lists get. */
+    private suspend fun channelsInRail(key: LiveKey): List<ChannelEntity> {
+        val c = ctx.value
+        if (c.profileId < 0) return emptyList()
+        if (key == LiveKey.History) return historyChannels(ZAP_LIST_LIMIT).map { it.channel }
+        val sources = c.sourceIds.ifEmpty { listOf(-1L) }
+        val raw = withContext(Dispatchers.IO) {
+            when (key) {
+                LiveKey.Favorites -> channelDao.snapshotFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, sources, ZAP_LIST_LIMIT)
+                LiveKey.Catchup -> channelDao.snapshotCatchup(sources, ZAP_LIST_LIMIT)
+                else -> channelDao.snapshotAll(sources, ZAP_LIST_LIMIT)
+            }
+        }
+        val cust = custom.value
+        val hiddenCats = hiddenCategoryIds.value
+        return raw
+            .filter { CustomizeKeys.channel(it) !in cust.hiddenItems && (it.categoryId == null || it.categoryId !in hiddenCats) }
+            .map { ch -> cust.itemNames[CustomizeKeys.channel(ch)]?.let { ch.copy(name = it) } ?: ch }
     }
 
     /** One custom category in its rail order, with the hide/rename treatment the Live list gives it. */
@@ -1059,14 +1142,15 @@ class LiveViewModel(
             .map { ch -> cust.itemNames[CustomizeKeys.channel(ch)]?.let { ch.copy(name = it) } ?: ch }
     }
 
-    /** The profile's recently-watched channels, for the right-hand in-player history overlay. */
-    suspend fun historyChannels(limit: Int = HISTORY_LIST_LIMIT): List<ChannelEntity> {
+    /** The profile's recently-watched channels and when each was watched, for the right-hand in-player
+     *  history overlay. */
+    suspend fun historyChannels(limit: Int = HISTORY_LIST_LIMIT): List<tv.own.owntv.core.database.dao.ChannelWithWatchedAt> {
         val pid = currentProfileId() ?: return emptyList()
         val cust = custom.value
         val hiddenCats = hiddenCategoryIds.value
-        return channelDao.recentlyWatched(pid, limit).first()
-            .filter { CustomizeKeys.channel(it) !in cust.hiddenItems && (it.categoryId == null || it.categoryId !in hiddenCats) }
-            .map { ch -> cust.itemNames[CustomizeKeys.channel(ch)]?.let { ch.copy(name = it) } ?: ch }
+        return channelDao.recentlyWatchedWithTimestamp(pid, limit).first()
+            .filter { (ch) -> CustomizeKeys.channel(ch) !in cust.hiddenItems && (ch.categoryId == null || ch.categoryId !in hiddenCats) }
+            .map { e -> cust.itemNames[CustomizeKeys.channel(e.channel)]?.let { e.copy(channel = e.channel.copy(name = it)) } ?: e }
     }
 
     /** True when full-screen is running on the **ExoPlayer** engine (a promoted preview) rather than mpv.
@@ -1087,6 +1171,7 @@ class LiveViewModel(
         // Cross-playlist failover: hop to the same channel elsewhere when the stream is interrupted.
         startFailoverWatcher()
         viewModelScope.launch { player.archiveEnded.collect { continueAfterCatchup() } }
+        viewModelScope.launch { player.archiveStalled.collect { liveAfterStall() } }
         // T17 / decision 5: on a 2 GB TV the preview pane decodes at most 720p — a second full-size
         // decoder re-tuning on every focus step is the heaviest background cost there. Lifted the moment
         // the channel goes full-screen, so the promoted stream switches up to its full variant.
@@ -1539,6 +1624,9 @@ class LiveViewModel(
         // tune would land half a second later and drag the user off the channel they just chose.
         pendingZapTuneJob?.cancel()
         pendingZapTuneJob = null
+        // Before the full-screen player is first drawn: a channel ExoPlayer is already previewing opens on
+        // ExoPlayer's surface straight away, instead of on mpv's until the tune below gets there.
+        live.expectPromotion(channel)
         // T6 — the controller's one tune job: a quicker second pick cancels the first wherever it has
         // got to, so two picks can no longer finish in the wrong order.
         live.launch { playChannel(channel) }
@@ -1772,6 +1860,21 @@ class LiveViewModel(
                 CatchupContinue.Next.Stop -> Unit // no guide beyond here — stop, as before
             }
         }
+    }
+
+    /**
+     * The archive on screen stopped arriving ([OwnTVPlayer.archiveStalled]). A replay of a programme
+     * still on air, or a rewind close to now, goes live instead of freezing; anything else stays with
+     * the player's own recovery. The rule is core's [CatchupContinue.liveAfterStall].
+     */
+    private fun liveAfterStall() {
+        val programmeStop = if (_catchupActive.value) playingCatchupProgramme?.stopMs else null
+        val rewound = timeshift.offsetSec.value != null
+        if (programmeStop == null && !rewound) return
+        val watching = if (rewound) timeshift.watchingWallMs.value else null
+        if (!CatchupContinue.liveAfterStall(programmeStop, watching, System.currentTimeMillis())) return
+        _catchupActive.value = false // as [continueAfterCatchup]: the channel is tuned live, not replayed
+        goToLive()
     }
 
     // ---- Live rewind / timeshift: the view model's half ---------------------------------------------

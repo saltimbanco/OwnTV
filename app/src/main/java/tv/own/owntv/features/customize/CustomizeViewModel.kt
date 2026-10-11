@@ -26,6 +26,7 @@ import tv.own.owntv.core.customize.CustomizationStore
 import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.database.dao.CategoryDao
 import tv.own.owntv.core.database.dao.ContentOrderDao
+import tv.own.owntv.core.database.entity.ContentOrderEntity
 import tv.own.owntv.core.database.dao.CustomCategoryDao
 import tv.own.owntv.core.database.dao.SourceDao
 import tv.own.owntv.core.model.MediaType
@@ -289,6 +290,44 @@ class CustomizeViewModel(
             contentOrderDao.clearContext(pid, type, row.key)
             // 2) DataStore: remove the definition + any hide/rename pins on it.
             customize.deleteCustomCategory(pid, type, row.key, formerMemberKeys)
+        }
+    }
+
+    /** The single playlist picked at the top right, or null for "All playlists" — what
+     *  [restoreSectionDefaults] covers, so the confirmation can name it. */
+    val restorePlaylistName: StateFlow<String?> = combine(ctx, settings.defaultSourceId) { c, id ->
+        c.sources.firstOrNull { it.id == id && id > 0 }?.name
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * Puts the playlists this section is showing (the top-right choice) back to what they provide: their hidden categories
+     * and items show again, their renames and category order are cleared, items moved out of their
+     * folders return and their manual item orders are dropped. Other playlists, custom categories
+     * (and what is in them), Favorites and the guide matches are left alone.
+     *
+     * Keys are "<sourceId>:<id>", so a playlist's entries are the ones whose prefix is one of the
+     * selected source ids; "custom:…" keys never match.
+     */
+    fun restoreSectionDefaults() {
+        val pid = ctx.value.profileId
+        if (pid < 0) return
+        viewModelScope.launch {
+            val type = _section.value
+            val ids = ctx.value.sourceIdsFor(type).toSet()
+            fun mine(key: String) = key.substringBefore(':').toLongOrNull() in ids
+            contentOrderDao.observeContextKeys(pid, type).first()
+                .filter { it != ContentOrderEntity.FAV_CONTEXT && mine(it) }
+                .forEach { contentOrderDao.clearContext(pid, type, it) }
+            customize.update(pid, type) {
+                it.copy(
+                    hiddenCategories = it.hiddenCategories.filterNot(::mine).toSet(),
+                    hiddenItems = it.hiddenItems.filterKeys { k -> !mine(k) },
+                    categoryNames = it.categoryNames.filterKeys { k -> !mine(k) },
+                    itemNames = it.itemNames.filterKeys { k -> !mine(k) },
+                    categoryOrder = it.categoryOrder.filterNot(::mine),
+                    movedFromOrigin = it.movedFromOrigin.filterKeys { k -> !mine(k) },
+                )
+            }
         }
     }
 

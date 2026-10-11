@@ -260,9 +260,13 @@ fun DownloadsScreen(
             }
         }
 
+        // The fallback warning takes a line under the title; everything below moves down by it, so a focused
+        // tab's glow never sits on the warning.
+        val warnShift = if (storage?.usingFallback == true) 24.mpx else 0.mpx
+
         // Tabs, 46 apart (each carries 12 of padding a side), and the Download folder tool at the list's right edge.
         Row(
-            Modifier.padding(start = contentStart + 8.mpx, top = 124.mpx).width(fx(1856) - contentStart - 8.mpx).focusGroup(),
+            Modifier.padding(start = contentStart + 8.mpx, top = 124.mpx + warnShift).width(fx(1856) - contentStart - 8.mpx).focusGroup(),
             horizontalArrangement = Arrangement.spacedBy(22.mpx),
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -297,7 +301,7 @@ fun DownloadsScreen(
                 root.trimEnd('/') + "/" + sub,
                 style = stageText(16, 500), color = StageColors.Dim, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                modifier = Modifier.padding(start = fx(1100), top = 168.mpx).width(fx(1856) - fx(1100) - 14.mpx),
+                modifier = Modifier.padding(start = fx(1100), top = 178.mpx + warnShift).width(fx(1856) - fx(1100) - 14.mpx),
             )
         }
 
@@ -308,7 +312,7 @@ fun DownloadsScreen(
             val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra * 2, maxWidth = constraints.maxWidth + extra * 2))
             layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-extra, 0) }
         }
-        Box(Modifier.padding(start = contentStart, top = 210.mpx).width(fx(1260) - contentStart).fillMaxSize()) {
+        Box(Modifier.padding(start = contentStart, top = 210.mpx + warnShift).width(fx(1260) - contentStart).fillMaxSize()) {
             if (listIds.isEmpty()) {
                 Text(
                     stringResource(if (tab == DownloadsTab.RECORDINGS) R.string.recording_empty else R.string.content_downloads_empty),
@@ -352,7 +356,7 @@ fun DownloadsScreen(
 
         RecordingsCard(
             recordings = recordings, recorded = recorded, onOpenGuide = onOpenGuide,
-            modifier = Modifier.padding(start = fx(1330), top = 236.mpx).width(fx(526)),
+            modifier = Modifier.padding(start = fx(1330), top = 236.mpx + warnShift).width(fx(526)),
         )
     }
 
@@ -551,7 +555,7 @@ internal fun StageDownloadRow(
             ) {
                 Box(Modifier.size(190.mpx, 107.mpx).clip(RoundedCornerShape(14.mpx))) { art() }
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = stageText(24, 700), color = if (hasFocus) Color.White else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = stageText(24, 700), color = if (hasFocus) StageColors.FxText else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(line, style = stageText(17, 400), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.mpx))
                     path?.takeIf { it.isNotBlank() }?.let {
                         Text(StorageAccess.folderLabel(it) ?: it, style = stageText(15, 500), color = StageColors.Dim, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.mpx))
@@ -605,7 +609,7 @@ private fun RecordingsCard(recordings: List<RecordingEntity>, recorded: Int, onO
             height = 58.mpx, textSize = 20, modifier = Modifier.padding(top = 22.mpx),
         )
         if (next != null) {
-            Box(Modifier.padding(top = 28.mpx, bottom = 22.mpx).fillMaxWidth().height(1.mpx).background(Color.White.copy(alpha = 0.1f)))
+            Box(Modifier.padding(top = 28.mpx, bottom = 22.mpx).fillMaxWidth().height(1.mpx).background(StageColors.Ink.copy(alpha = 0.1f)))
             Row(horizontalArrangement = Arrangement.spacedBy(10.mpx), verticalAlignment = Alignment.CenterVertically) {
                 tv.own.owntv.ui.components.OwnTVIcon(OwnTVIcon.CLOCK, StageColors.Muted, Modifier.size(18.mpx))
                 Text(stringResource(R.string.recording_group_scheduled), style = stageText(18, 700), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)

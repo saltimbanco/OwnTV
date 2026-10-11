@@ -33,7 +33,10 @@ for that step shown in the corner.
 4. **Set up OwnTV** — three ways to begin: **New profile**, **Restore a backup**, or
    **From another device** (copy everything off a TV you already have — see below). A restore asks
    which parts of the backup to bring back before it applies anything, so you can take the playlists
-   and leave the old box's settings behind.
+   and leave the old box's settings behind. Untick **Sources** and it warns you: the TV then gets no
+   playlists. The app opens only once the whole restore is done, and starts downloading the restored
+   playlists straight away. An encrypted backup asks for its
+   password; press ▶ on the field to see what you typed.
 5. **Profile** — name it, pick an avatar, and optionally make it a **Kids** profile or give it a PIN.
 6. **Add a playlist** — four cards: **Remote** (fill it in on your phone), **Type it here** (type it
    with the remote: M3U, Xtream or Stalker), **Import** a backup file, or **Existing** (only shown
@@ -114,11 +117,12 @@ and shows its page beside the list; **Right** enters that page; **Back** returns
 | **Right** | Live TV channel list | Steps into the schedule beside the preview — what's next and later; OK = Remind me / Record / Watch |
 | **Hold Up / Down** | Live TV, Movies, Series lists | Runs through the list to its ends |
 | **Left** | full-screen live | Channel list for the folder you came from |
-| **Left ×2** | full-screen live | All Live TV categories — switch folder without stopping the stream |
-| **Right** | full-screen live | The last 30 channels you watched |
+| **Left ×2** | full-screen live | All Live TV categories, the same sheet as Live TV's (search, Favorites, Recently watched, Catch-up, All channels, groups) — switch list without stopping the stream |
+| **Right** | full-screen live | The last 30 channels you watched, each with when you watched it |
 | **Left / Right** | full-screen live, a channel you can rewind (catch-up, or saved by **Pause and rewind live TV**), **Left and right rewind live TV** on | Rewind / go forward instead of the lists (the timeline comes up; hold to scrub) |
 | **Left / Right** | film or episode, controls hidden | Skip back / forward by your seek step; the seek bar comes up, hold to keep scrubbing |
 | **CH+ / CH−** | full-screen live | Next / previous channel. Wraps around. Always works |
+| **CH+ / CH−** | the channel, history or all-categories list over the player, Multiview's channel picker | Page by 10 items, like any browse list. **Long-press** jumps to first/last |
 | **Last channel** key | full-screen live | Back to the channel you watched before (press again to flip back). Also the clock button on the player bar |
 | **Up / Down** | full-screen live, controls hidden | Same as CH+/CH− |
 | **0–9** | full-screen live | Type a channel number to tune. OK submits, Back cancels |
@@ -193,6 +197,8 @@ under **Advanced device identification**.
 **Where:** Live TV → focus a channel → **OK**
 The preview pane plays it first; OK goes full screen with no reload. Beside the video: the programme,
 its progress and time left, the synopsis, and what's on next and later.
+If the stream stalls, the last picture stays on screen; after about 10 seconds the player says
+**Stream interrupted. Reconnecting…** and the picture comes back by itself when the network does.
 
 ### 🗂️ Categories
 **Where:** Live TV → **Left**
@@ -260,6 +266,8 @@ then the grid, opened at now with the now-line about a third of the way across.
 - **Hold OK** on a programme: **Remind me** (upcoming) or **Watch from start** (past), **Record**,
   **Watch channel** and more.
 - **Order:** Provider, A–Z, Catch-up first or Favourites first. **Category** uses Live TV's own list.
+  Its **Show** group: **Channels without guide**, and **Video preview** — off, the top shows the
+  channel's logo instead of playing it (also off whenever Live TV's preview is off).
 
 ### 🔔 Programme reminders
 **Where:** hold OK on an upcoming programme → **Remind me** · Settings → Sources & guide →
@@ -336,6 +344,8 @@ dropped; playback jumps over it.
 ### ⏭️ Catch-up plays on
 A finished catch-up programme continues to the next one, and hands over to the live channel once you
 catch up with the present. Controlled by **Settings → Watching & recording → Auto-play next episode**.
+If you replay a programme that is still on air and the provider stops sending it partway, the
+channel switches to live by itself instead of freezing.
 
 ### 🕰️ Two clocks
 While replaying, the player shows **Programme time** (when it originally aired) next to **Current
@@ -346,7 +356,10 @@ time**, with a **Playing / Then** guide row.
 button in the player
 A guide recording follows the programme's times; the others record from now. **Record every showing**
 sets a standing rule for that programme on that channel. Recordings appear in
-**Downloads → Recordings**. **Settings → Watching & recording → Recording** sets the padding
+**Downloads → Recordings**. **Schedule recording…** in a channel's menu records it between a day and
+times you pick — guide or not; an end before the start means the next day, and an overlap with another
+recording on the same playlist is shown before you confirm. While a channel records, its menu offers
+**Stop recording**. **Settings → Watching & recording → Recording** sets the padding
 (**Start early**, **Keep going after the end**) and whether one stream is always kept free.
 
 > A recording costs one of your provider's connections and says so before it starts.
@@ -401,7 +414,8 @@ Rolls into the next season too. In the last 30 seconds a card counts down, with 
 **Cancel**.
 
 ### ✅ Watched state
-A ✓ once watched to 95%, a progress bar when part-way. Long-press → **Mark as watched /
+A ✓ once watched to 95%, a progress bar when part-way — on episodes and on film posters; a show's
+poster carries the bar of its latest part-watched episode. Long-press → **Mark as watched /
 unwatched** to correct it by hand.
 
 ### ↕️ Episode order & hide watched
@@ -456,7 +470,7 @@ QR + PIN rather than typing it. A self-hosted Cloudflare Worker also works (one 
 **Where:** the top of Home · Settings → Layout → Home screen → **Now trending**
 Current TMDB charts, filtered to titles your provider can actually play — up to 10, refreshed every
 five to eight days; needs TMDB metadata. **Full-bleed** (default) shows one title over its backdrop:
-its rank, **IN YOUR PLAYLIST**, title, year, genres, rating, synopsis, and **Play** (or **Open
+its rank, **IN YOUR PLAYLIST**, title (its title art when TMDB has it), year, genres, rating, synopsis, and **Play** (or **Open
 episodes**), **Trailer**, **All versions** (when your playlist has several copies), details and
 favourite. **Down** reaches the pager under the buttons; **◀ ▶** there change the title. Moving into
 the rows folds the hero small; **Up** from the first row opens it again. **Posters only** shows the
@@ -465,6 +479,10 @@ trending titles as the first poster row instead.
 ### ▶️ Keep watching
 Partly-watched films, episodes and recent channels, newest first, as wide pictures with progress and
 "S1 · E2 · 31 min left". Rest on a card for 3 seconds and it plays a preview inside the card.
+
+### ⭐ Favourite movies · Favourite series
+Your favourited films and shows as poster rows, in your Favorites order. **OK** on a film opens it in
+Movies; on a show, its episodes. A row with no favourites isn't shown.
 
 ### 🧩 Rearrange Home
 **Where:** Settings → Layout → **Home screen** (per profile)
@@ -491,9 +509,13 @@ switch channel rows between **Cards** and **On now** (an inline mini-guide).
 ### 🔎 Search
 **Where:** the rail → Search
 Searches Live, Movies and Series together, with tabs **All / Live TV / Movies / Series** and their
-counts. A channel shows Live TV's preview beside the results; a film or show shows its poster panel.
+counts — every match, up to 500 of each kind. Words match from their start, and a dash or other mark
+counts as a gap: "Spider-M" finds every Spider-Man. A channel shows Live TV's preview beside the
+results; a film or show shows its poster panel.
 **OK takes you to the item** — the channel in its own category, the film in its grid, the series page
-— where play, download and every option live; **Back** returns to Search with your query kept. With
+— where play, download and every option live; **Back** returns to Search with your query kept.
+**On TV** lists programmes from the stored guide whose title matches, on now or within the next 12
+hours, with the channel and time; **OK** goes to that channel. With
 the box empty: **Jump to**, your recent searches, and Continue watching.
 
 ### ⭐ Favourites
@@ -614,7 +636,9 @@ appears on a TV that supports it, and switches itself off for good if a channel 
 
 ### 🎨 Theme & accent
 **Where:** Settings → Appearance
-**System**, **Dark** or **Light** (◀ ▶ on the row), plus an **Accent color**: presets, a hex code, or a
+**System** (follows the TV's own dark/light setting), **Dark** or **Light** (◀ ▶ on the row) — Light turns
+the pages, panels and the player's controls and lists paper-white with dark text and an accent ring on the
+focused item; the video and posters stay as they are — plus an **Accent color**: presets, a hex code, or a
 colour square and hue bar (OK enters each, OK or Back leaves); the screen re-tints live and **Cancel**
 restores. The accent reaches the player too — seek bar, active buttons, badges. A live preview of Home
 beside the rows shows each change before you leave it.
@@ -685,6 +709,13 @@ Hide, rename, reorder, and **unhide**. Highlights:
 - **Custom combined categories** — **＋ New category**, then **Move to category…** from any item.
   **Remove from this category** (long-press a channel inside it, or here) takes it out of that category
   only. Hiding a channel's own provider category no longer hides it from your custom categories.
+- **Restore to playlist default** — long-press a category → **Restore to playlist default**
+  brings back its hidden items, returns items you moved out to another category, and clears your
+  custom order. It lists what it will change first, or says the category is already at the default.
+  In Settings → **Customize categories & items**, **⋯ More → Restore playlist defaults** does the same
+  for every category of the playlist(s) shown (the playlist picker at the top right), in the section you
+  are on (Live TV, Movies or Series): hidden categories and items, renames, category order and custom
+  order. Other playlists, combined categories, favorites and guide matches are kept.
 - **Span select** — long-press a **Hide** or **move** button to act on a whole block at once.
 - **PIN lock** this screen with **Set PIN**.
 

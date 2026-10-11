@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -174,7 +175,7 @@ fun StageRail(
 
     Box(modifier.fillMaxSize()) {
         if (state == RailState.OPEN && open) {
-            Box(Modifier.fillMaxSize().background(Color(2, 5, 6).copy(alpha = 0.55f)))
+            Box(Modifier.fillMaxSize().background(StageColors.Scrim))
         }
         if (state == RailState.HIDDEN) RailEdgeGlow(Modifier.align(Alignment.CenterStart))
 
@@ -327,7 +328,7 @@ private fun RailSeparator(open: Boolean) {
         Modifier
             .then(if (open) Modifier.fillMaxWidth().padding(horizontal = 14.mpx, vertical = 10.mpx) else Modifier.padding(vertical = 8.mpx).width(34.mpx))
             .height(1.mpx)
-            .background(Color.White.copy(alpha = 0.12f)),
+            .background(StageColors.Ink.copy(alpha = 0.12f)),
     )
 }
 
@@ -353,14 +354,16 @@ private fun RailItem(
     StageSurface(
         onClick = onClick,
         radius = r,
-        modifier = modifier.then(if (open) Modifier.fillMaxWidth().height(60.mpx) else Modifier.size(58.mpx)),
+        // At least 60, not exactly: with a large font size the name and its detail line need more, and a
+        // fixed height cut the detail line off (#7.2).
+        modifier = modifier.then(if (open) Modifier.fillMaxWidth().heightIn(min = 60.mpx) else Modifier.size(58.mpx)),
         idle = if (active) Modifier.background(a.accent.copy(alpha = 0.14f), RoundedCornerShape(r)) else Modifier,
         contentAlignment = if (open) Alignment.CenterStart else Alignment.Center,
     ) { focused ->
         val iconTint = when {
             focused -> a.onAccent
             active || accentIcon -> a.accent
-            else -> Color(0xFFC4CFCA)
+            else -> StageColors.NavText
         }
         if (!open) {
             OwnTVIcon(icon, iconTint, Modifier.size(27.mpx))
@@ -368,7 +371,7 @@ private fun RailItem(
             return@StageSurface
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 18.mpx),
+            Modifier.fillMaxWidth().padding(horizontal = 18.mpx, vertical = 6.mpx),
             horizontalArrangement = Arrangement.spacedBy(18.mpx),
             verticalAlignment = Alignment.CenterVertically,
         ) {
