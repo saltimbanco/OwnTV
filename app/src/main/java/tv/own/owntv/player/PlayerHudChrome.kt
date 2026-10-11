@@ -275,7 +275,15 @@ internal fun ChannelNumberCard(digits: String, error: String? = null, modifier: 
 internal fun CenterControls(
     player: PlaybackEngine, nav: NavState, isPlaying: Boolean, isLive: Boolean,
     onRewindLive: (() -> Unit)?, onForwardLive: (() -> Unit)?, timeshiftOffset: () -> Int?,
-    playFocus: FocusRequester, modifier: Modifier = Modifier,
+    playFocus: FocusRequester,
+    /**
+     * Step to the previous/next live channel of the same zap list, wrapping at both ends; null
+     * hides the button. Distinct from the history recall in the tools cluster, which returns to
+     * the channel watched before this one rather than moving within the list.
+     */
+    onChannelPrevious: (() -> Unit)? = null,
+    onChannelNext: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val seekStep by player.seekStepMs.collectAsStateWithLifecycle() // Settings -> Seek step
     val rewindMode = onRewindLive != null // this is a catch-up-capable Live channel
@@ -294,6 +302,10 @@ internal fun CenterControls(
         }
         TransportCapsule {
             if (nav.hasPrev) CircleButton(OwnTVIcon.SKIP_PREVIOUS, size = 44) { player.previous() }
+            // Live: the previous/next channel of the same zap list at the capsule's outer ends, so
+            // a remote without channel keys can still zap without opening the channel list. Hidden
+            // with a single-channel list.
+            if (isLive && onChannelPrevious != null) CircleButton(OwnTVIcon.SKIP_PREVIOUS, size = 44) { onChannelPrevious() }
             when {
                 rewindMode -> CircleButton(OwnTVIcon.REWIND, size = 44) { onRewindLive() } // step back into the archive
                 !isLive -> CircleButton(OwnTVIcon.REWIND, size = 44) { player.seekBy(-seekStep) }
@@ -306,6 +318,7 @@ internal fun CenterControls(
             // "Go to live" is no longer a transport button: it is the Go Live pill at the head of the
             // dock's left cluster, beside the timeline it acts on.
             if (nav.hasNext) CircleButton(OwnTVIcon.SKIP_NEXT, size = 44) { player.next() }
+            if (isLive && onChannelNext != null) CircleButton(OwnTVIcon.SKIP_NEXT, size = 44) { onChannelNext() }
         }
     }
 }

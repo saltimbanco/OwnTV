@@ -1447,6 +1447,160 @@ class SettingsViewModel(
         importer.reset()
     }
 
+    // ---- Bulk server import from a picked text file (one Xtream/Stalker server per line) ----
+    //
+    // The `.own` backup already restores many sources at once, but it is a backup container
+    // (JSON + assets, optionally whole-file encrypted), not a server list. This is the plain-text
+    // counterpart: [parseServerList] reads the picked document's text (read by the UI, which owns
+    // the ContentResolver — this view model holds no Context), then every entry goes through
+    // core's [SourceImporter] one at a time, so validation, sync and error handling stay core's.
+    // Scopes mirror the single-add defaults (Xtream everything now, Stalker live now with VOD
+    // deferred).
+    //
+    // Replace semantics: once the text has parsed to at least one usable server, the active
+    // profile's existing playlists are deleted first, then the file's servers are added.
+
+    sealed interface BulkImportUi {
+        data object Idle : BulkImportUi
+        data class Running(val done: Int, val total: Int, val currentName: String) : BulkImportUi
+        data class Done(
+            val succeeded: List<String>,
+            val failed: List<BulkFailure>,
+        ) : BulkImportUi
+        data class ParseError(val reason: BulkParseReason, val lines: Int = 0, val label: String = "") : BulkImportUi
+    }
+
+    enum class BulkParseReason { NoProfile, UnreadableFile, Empty, UnreadableLines }
+
+    data class BulkFailure(
+        val name: String,
+        /** Core's failure when the import ran and reported one; null when it threw before that. */
+        val failure: SourceImporter.SetupFailure?,
+        val detail: String?,
+    ) {
+        /** Same mapping as a single add's [ImportState]: InvalidMac, else the sync failure. */
+        fun friendly(): tv.own.owntv.core.util.FriendlySyncFailure = when (val f = failure) {
+            SourceImporter.SetupFailure.InvalidMac -> tv.own.owntv.core.util.FriendlySyncFailure.InvalidMac
+            is SourceImporter.SetupFailure.Sync -> f.failure
+            else -> classifySyncFailure(null, online = true)
+        }
+    }
+
+    private val _bulkImport = MutableStateFlow<BulkImportUi>(BulkImportUi.Idle)
+    val bulkImport: StateFlow<BulkImportUi> = _bulkImport.asStateFlow()
+
+    fun dismissBulkImport() {
+        _bulkImport.value = BulkImportUi.Idle
+    }
+
+    fun cancelBulkImport() {
+        bulkImportJob?.cancel()
+        bulkImportJob = null
+        importer.reset()
+        _bulkImport.value = BulkImportUi.Idle
+    }
+
+    private var bulkImportJob: Job? = null
+
+    /**
+     * Import the servers listed in [text] (null when the picked document could not be read).
+     * Display-name lambdas come from the UI's resources; the view model itself holds no Context.
+     */
+    fun importServerListText(
+        text: String?,
+        defaultServerName: (Int) -> String,
+        defaultPortalName: (Int) -> String,
+        /** Display label of the picked document, for the unreadable-file message. */
+        fileLabel: String = "",
+    ) {
+        bulkImportJob?.cancel()
+        bulkImportJob = viewModelScope.launch {
+            val pid = profileDao.resolveExistingProfileId(settings.activeProfileId.first())
+            if (pid == null) {
+                _bulkImport.value = BulkImportUi.ParseError(BulkParseReason.NoProfile)
+                return@launch
+            }
+            if (text == null) {
+                _bulkImport.value = BulkImportUi.ParseError(BulkParseReason.UnreadableFile, label = fileLabel)
+                return@launch
+            }
+            val parsed = parseServerList(text, defaultServerName, defaultPortalName)
+            if (parsed.entries.isEmpty()) {
+                _bulkImport.value = BulkImportUi.ParseError(
+                    if (parsed.skipped.isEmpty()) BulkParseReason.Empty else BulkParseReason.UnreadableLines,
+                    parsed.skipped.size,
+                )
+                return@launch
+            }
+            importer.useProfile(pid)
+            importer.reset()
+            // File import replaces: drop the profile's current playlists before adding the file's.
+            // Runs only after the text parsed to something usable, so an unreadable file never
+            // wipes anything. Each delete goes through SourceRepository like a manual delete
+            // (content cascades), syncs cancelled and portal sessions dropped first, default
+            // playlist reset when it was among the deleted.
+            val existingIds = runCatching { sourceDao.sourceIdsForProfile(pid) }.getOrDefault(emptyList())
+            if (existingIds.isNotEmpty()) {
+                _deletingSourceIds.value = _deletingSourceIds.value + existingIds.toSet()
+                try {
+                    for (sid in existingIds) {
+                        runCatching { catalogSyncScheduler.cancelSync(sid) }
+                        runCatching { stalkerAuth.invalidate(sid) }
+                    }
+                    val currentDefault = runCatching { settings.defaultSourceId.first() }.getOrDefault(-1L)
+                    withContext(NonCancellable) {
+                        for (sid in existingIds) {
+                            val s = runCatching { sourceDao.getById(sid) }.getOrNull() ?: continue
+                            runCatching { sourceRepository.deleteSource(s) }
+                            expiryCache.remove(sid)
+                        }
+                        if (currentDefault in existingIds) {
+                            runCatching { settings.setDefaultSource(-1L) }
+                        }
+                    }
+                } finally {
+                    _deletingSourceIds.value = _deletingSourceIds.value - existingIds.toSet()
+                }
+            }
+            val succeeded = mutableListOf<String>()
+            val failed = mutableListOf<BulkFailure>()
+            parsed.entries.forEachIndexed { index, entry ->
+                _bulkImport.value = BulkImportUi.Running(index, parsed.entries.size, entry.name)
+                val thrown = runCatching {
+                    when (entry) {
+                        is ServerListEntry.Xtream -> importer.xtream(
+                            name = entry.name, server = entry.server, username = entry.username,
+                            password = entry.password, autoRefresh = PlaylistRefresh.OFF,
+                            live = SyncScopeChoice.Now, movies = SyncScopeChoice.Now,
+                            series = SyncScopeChoice.Now,
+                        )
+                        is ServerListEntry.Stalker -> importer.stalker(
+                            name = entry.name, portalUrl = entry.portalUrl, mac = entry.mac,
+                            serialNumber = entry.serialNumber, deviceId = entry.deviceId,
+                            deviceId2 = entry.deviceId2, signature = entry.signature,
+                            autoRefresh = PlaylistRefresh.OFF, live = SyncScopeChoice.Now,
+                            movies = SyncScopeChoice.Later, series = SyncScopeChoice.Later,
+                        )
+                    }
+                }.exceptionOrNull()
+                // runCatching must not swallow cancellation: cancelling the bulk job has to stop
+                // the loop, not record one more failed server and carry on.
+                if (thrown is kotlinx.coroutines.CancellationException) throw thrown
+                when (val state = importer.state.value) {
+                    is SourceImporter.ImportState.Success -> succeeded.add(entry.name)
+                    is SourceImporter.ImportState.Failed ->
+                        failed.add(BulkFailure(entry.name, state.failure, thrown?.message))
+                    else -> failed.add(BulkFailure(entry.name, null, thrown?.message ?: state.toString()))
+                }
+                importer.reset()
+            }
+            runCatching { refreshActiveTvHome(allowBrowsableRequest = true) }
+            _bulkImport.value = BulkImportUi.Done(succeeded, failed)
+        }.also { job ->
+            job.invokeOnCompletion { if (bulkImportJob == job) bulkImportJob = null }
+        }
+    }
+
     private suspend fun refreshActiveTvHome(allowBrowsableRequest: Boolean = true) {
         val pid = profileDao.resolveExistingProfileId(settings.activeProfileId.first()) ?: return
         Log.d(TAG, "refreshActiveTvHome profile=$pid allowBrowsable=$allowBrowsableRequest")

@@ -546,7 +546,7 @@ fun EpgScreen(
                             verticalArrangement = Arrangement.spacedBy(GuideGridDefaults.RowGap),
                             contentPadding = PaddingValues(bottom = 24.mpx),
                         ) {
-                            itemsIndexed(state.channels, key = { _, ch -> ch.id }) { index, channel ->
+                            itemsIndexed(state.channels, key = { _, ch -> ch.id }, contentType = { _, _ -> "channel" }) { index, channel ->
                                 GuideRow(
                                     vm = vm,
                                     channel = channel,

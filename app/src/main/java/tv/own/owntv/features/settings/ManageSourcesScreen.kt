@@ -6,6 +6,8 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 import tv.own.owntv.ui.theme.StageColors
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -28,8 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.Text
 import tv.own.owntv.R
@@ -77,6 +84,7 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val sourceExpiry by vm.sourceExpiry.collectAsStateWithLifecycle()
     val sourceTest by vm.sourceTest.collectAsStateWithLifecycle()
     val deletingIds by vm.deletingSourceIds.collectAsStateWithLifecycle()
+    val bulkImport by vm.bulkImport.collectAsStateWithLifecycle()
     val epgSync by vm.epgSync.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
     val defaultIptvName = stringResource(R.string.setup_default_iptv)
@@ -93,6 +101,27 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var confirmRetest by remember { mutableStateOf<SourceEntity?>(null) }
     val addFocus = remember { FocusRequester() }
     val errorFocus = remember { FocusRequester() }
+
+    // Bulk server-list import: a plain-text file with one Xtream/Stalker server per line.
+    // The text is read here (the view model holds no Context) and handed over parsed-ready.
+    val context = LocalContext.current
+    val ioScope = rememberCoroutineScope()
+    val pickServerList = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        ioScope.launch {
+            val text = uri?.let {
+                withContext(Dispatchers.IO) {
+                    runCatching { context.contentResolver.openInputStream(it)?.bufferedReader()?.readText() }.getOrNull()
+                }
+            }
+            val res = context.resources
+            vm.importServerListText(
+                text,
+                defaultServerName = { res.getString(R.string.settings_bulk_import_default_server, it) },
+                defaultPortalName = { res.getString(R.string.settings_bulk_import_default_portal, it) },
+                fileLabel = uri?.lastPathSegment.orEmpty(),
+            )
+        }
+    }
 
     // Per-row focus restore (mirrors MoviesScreen): track the row the user is acting on so, when
     // edit/re-sync/delete closes, focus lands back inside the list — on the same row if it survived,
@@ -148,6 +177,7 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
     BackHandler {
         when {
+            bulkImport is SettingsViewModel.BulkImportUi.Running -> Unit
             showAdd -> { showAdd = false; addMode = null; vm.stopRemoteListener(); vm.cancelImport() }
             editingSource != null -> editingSource = null
             else -> onBack()
@@ -292,6 +322,11 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         icon = tv.own.owntv.ui.components.OwnTVIcon.ADD, boxed = true,
                         modifier = Modifier.focusRequester(addFocus),
                     )
+                    tv.own.owntv.ui.stage.StageTool(
+                        stringResource(R.string.settings_sources_import_file),
+                        onClick = { pickServerList.launch(arrayOf("text/plain")) },
+                        icon = tv.own.owntv.ui.components.OwnTVIcon.PLAYLIST, boxed = true,
+                    )
                 },
             ) {
                 if (sources.isEmpty()) StageSettingsNote(stringResource(R.string.settings_sources_empty), null)
@@ -344,6 +379,17 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     { confirmRetest = src }
                 },
                 onSkip = { vm.skipConnectionMeasurement() },
+            )
+        }
+
+        // Bulk server-list import progress and result. A bulk run keeps going behind this page,
+        // so leaving mid-run strands it with no way back to its result — the running dialog
+        // cannot be dismissed, only cancelled (Back is swallowed above while it runs).
+        if (bulkImport !is SettingsViewModel.BulkImportUi.Idle) {
+            BulkImportDialogs(
+                bulk = bulkImport,
+                onDismiss = vm::dismissBulkImport,
+                onCancel = vm::cancelBulkImport,
             )
         }
 
@@ -641,9 +687,83 @@ internal fun SourceTestDialog(
     }
 }
 
+/**
+ * Bulk server-list import progress and result, in the same Stage popup shape as the source test:
+ * a spinner row while running (Back swallowed, Cancel only), counts plus per-server reasons when
+ * done, and the expected format alongside a parse error.
+ */
 @Composable
-private fun SourceTestReport(result: SourceTestResult, limit: tv.own.owntv.core.live.ConnectionLimit?) {
-    val res = LocalContext.current.resources
+private fun BulkImportDialogs(
+    bulk: SettingsViewModel.BulkImportUi,
+    onDismiss: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val focus = remember { FocusRequester() }
+    // Keyed on the state itself, so each phase change moves focus onto the new primary button.
+    LaunchedEffect(bulk) {
+        withFrameNanos { }
+        kotlinx.coroutines.delay(60)
+        runCatching { focus.requestFocus() }
+    }
+    val line = tv.own.owntv.ui.theme.stageText(18, 500)
+    when (bulk) {
+        is SettingsViewModel.BulkImportUi.Idle -> Unit
+        is SettingsViewModel.BulkImportUi.Running -> tv.own.owntv.ui.stage.StagePopup(
+            onDismiss = {},
+            title = stringResource(R.string.settings_bulk_import_title, bulk.done + 1, bulk.total),
+            buttons = {
+                tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = onCancel, height = 56.mpx, textSize = 19, modifier = Modifier.focusRequester(focus))
+            },
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OwnTVSpinner(sizeDp = 22)
+                Spacer(Modifier.width(16.mpx))
+                Text(bulk.currentName, style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
+            }
+        }
+        is SettingsViewModel.BulkImportUi.Done -> tv.own.owntv.ui.stage.StagePopup(
+            onDismiss = onDismiss,
+            title = stringResource(R.string.settings_bulk_import_done),
+            buttons = {
+                tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_ok), onClick = onDismiss, height = 56.mpx, textSize = 19, tinted = true, modifier = Modifier.focusRequester(focus))
+            },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.mpx)) {
+                Text(pluralStringResource(R.plurals.settings_bulk_import_added, bulk.succeeded.size, bulk.succeeded.size), style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
+                Text(pluralStringResource(R.plurals.settings_bulk_import_failed, bulk.failed.size, bulk.failed.size), style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
+                bulk.failed.forEach { failure ->
+                    val reason = failure.friendly().displayText().takeIf { it.isNotBlank() }
+                        ?: failure.detail.orEmpty()
+                    Text(
+                        text = if (reason.isBlank()) failure.name
+                        else stringResource(R.string.settings_bulk_import_failure_line, failure.name, reason),
+                        style = tv.own.owntv.ui.theme.stageText(16, 500),
+                        color = tv.own.owntv.ui.theme.StageColors.Muted,
+                    )
+                }
+            }
+        }
+        is SettingsViewModel.BulkImportUi.ParseError -> {
+            val message = when (bulk.reason) {
+                SettingsViewModel.BulkParseReason.NoProfile -> stringResource(R.string.settings_bulk_import_no_profile)
+                SettingsViewModel.BulkParseReason.UnreadableFile -> stringResource(R.string.settings_bulk_import_unreadable_file, bulk.label)
+                SettingsViewModel.BulkParseReason.Empty -> stringResource(R.string.settings_bulk_import_empty)
+                SettingsViewModel.BulkParseReason.UnreadableLines -> pluralStringResource(R.plurals.settings_bulk_import_unreadable, bulk.lines, bulk.lines)
+            }
+            tv.own.owntv.ui.stage.StagePopup(
+                onDismiss = onDismiss,
+                title = stringResource(R.string.settings_bulk_import_parse_error),
+                body = message + "\n\n" + stringResource(R.string.settings_bulk_import_format_hint),
+                buttons = {
+                    tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_ok), onClick = onDismiss, height = 56.mpx, textSize = 19, tinted = true, modifier = Modifier.focusRequester(focus))
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SourceTestReport(result: SourceTestResult, limit: tv.own.owntv.core.live.ConnectionLimit?) {    val res = LocalContext.current.resources
     Column(verticalArrangement = Arrangement.spacedBy(8.mpx)) {
         Text(
             result.headline(res), style = tv.own.owntv.ui.theme.stageText(20, 700),

@@ -722,7 +722,7 @@ internal fun GuideReviewPopup(
                             ),
                         ),
                 ) {
-                    itemsIndexed(suggestions, key = { _, s -> s.channel.id }) { index, s ->
+                    itemsIndexed(suggestions, key = { _, s -> s.channel.id }, contentType = { _, _ -> "suggestion" }) { index, s ->
                         GuideReviewRow(
                             s, onAccept = { onAccept(s) }, onSkip = { onSkip(s) },
                             acceptFocus = acceptFocus(index), bulkFocus = bulkFocus,

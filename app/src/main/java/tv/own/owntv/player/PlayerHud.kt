@@ -669,7 +669,12 @@ fun PlayerHud(
             // Hide the transport (play/seek/prev/next) and bottom bar while an error is up — the error
             // overlay owns the screen with its own Retry, so the play/rewind/forward must not show behind it.
             if (error == null) {
-                CenterControls(player, nav, isPlaying, isLive, onRewindLive, onForwardLive, timeshiftOffset, playFocus, modifier = Modifier.align(Alignment.Center))
+                CenterControls(player, nav, isPlaying, isLive, onRewindLive, onForwardLive, timeshiftOffset, playFocus,
+                    // On-screen zap when the remote has no channel keys (or they are awkward to reach):
+                    // same wrapped step as CH±, hidden with a single-channel list.
+                    onChannelPrevious = if (isLive && canZap) ({ zap(-1) }) else null,
+                    onChannelNext = if (isLive && canZap) ({ zap(1) }) else null,
+                    modifier = Modifier.align(Alignment.Center))
 
                 val reportDuration = duration.takeIf { it > 0 }?.let { formatTime(it) }
                 val reportSavedMessage = stringResource(R.string.player_report_saved)

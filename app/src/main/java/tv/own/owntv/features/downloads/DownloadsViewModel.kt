@@ -66,30 +66,42 @@ class DownloadsViewModel(
                 profileDao.observeById(pid),
             ) { list, custMovie, custSeries, profile ->
                 if (custMovie.hiddenItems.isEmpty() && custSeries.hiddenItems.isEmpty() && profile?.isKids != true) list
-                else list.filterNot { isHidden(it, custMovie, custSeries, profile?.isKids == true) }
+                else {
+                    // Bulk the catalog reads: one movies query + one series query per emission
+                    // instead of one query per row on every progress tick. Episodes resolve to
+                    // their series first (no bulk episode query exists); category names are
+                    // cached per emission, since many rows share a handful of categories.
+                    val isKidsProfile = profile?.isKids == true
+                    val movieIds = list.filter { it.mediaType == MediaType.MOVIE }.map { it.itemId }.distinct()
+                    val movies = if (movieIds.isNotEmpty()) movieDao.getByIds(movieIds).associateBy { it.id } else emptyMap()
+                    val episodes = list.filter { it.mediaType == MediaType.EPISODE }
+                        .associate { it.itemId to seriesDao.getEpisodeById(it.itemId) }
+                    val seriesIds = episodes.values.mapNotNull { it?.seriesId }.distinct()
+                    val shows = if (seriesIds.isNotEmpty()) seriesDao.getSeriesByIds(seriesIds).associateBy { it.id } else emptyMap()
+                    val categoryNames = HashMap<Long, String?>()
+                    suspend fun categoryName(id: Long?): String? {
+                        if (id == null) return null
+                        return categoryNames[id]
+                            ?: categoryDao.getById(id)?.name.also { categoryNames[id] = it }
+                    }
+                    list.filterNot { d ->
+                        when (d.mediaType) {
+                            MediaType.MOVIE -> movies[d.itemId]?.let { movie ->
+                                CustomizeKeys.movie(movie) in custMovie.hiddenItems ||
+                                    (isKidsProfile && tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(categoryName(movie.categoryId)))
+                            } ?: isKidsProfile
+                            MediaType.EPISODE -> episodes[d.itemId]?.let { ep -> shows[ep.seriesId] }?.let { series ->
+                                CustomizeKeys.series(series) in custSeries.hiddenItems ||
+                                    (isKidsProfile && tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(categoryName(series.categoryId)))
+                            } ?: isKidsProfile
+                            else -> false
+                        }
+                    }
+                }
                 }
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    private suspend fun isHidden(
-        d: DownloadEntity,
-        custMovie: SectionCustomizations,
-        custSeries: SectionCustomizations,
-        isKidsProfile: Boolean,
-    ): Boolean = when (d.mediaType) {
-        MediaType.MOVIE -> movieDao.getById(d.itemId)?.let { movie ->
-            CustomizeKeys.movie(movie) in custMovie.hiddenItems ||
-                (isKidsProfile && tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(movie.categoryId?.let { categoryDao.getById(it)?.name }))
-        } ?: isKidsProfile
-        MediaType.EPISODE -> seriesDao.getEpisodeById(d.itemId)
-            ?.let { ep -> seriesDao.getSeriesById(ep.seriesId) }
-            ?.let { series ->
-                CustomizeKeys.series(series) in custSeries.hiddenItems ||
-                    (isKidsProfile && tv.own.owntv.core.content.AdultCategoryClassifier.isAdult(series.categoryId?.let { categoryDao.getById(it)?.name }))
-            } ?: isKidsProfile
-        else -> false
-    }
 
     /**
      * What a row shows besides the stored title: the show's name for an episode, 16:9 art, and the

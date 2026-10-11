@@ -140,7 +140,7 @@ class CustomizeItemsViewModel(
     }.flatMapLatest { (ci, ordered, cust) ->
         if (ci == null) flowOf(PagingData.empty())
         else {
-            Pager(PagingConfig(pageSize = 60)) { pagingSource(ci.categoryId, ci, ordered) }
+            Pager(PagingConfig(pageSize = 60, prefetchDistance = 30, initialLoadSize = 90, maxSize = 300, enablePlaceholders = false)) { pagingSource(ci.categoryId, ci, ordered) }
                 .flow
                 .map { pagingData ->
                     pagingData.map { entity ->

@@ -336,6 +336,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         itemsIndexed(
                             hiddenChannels.entries.sortedBy { it.value.lowercase() },
                             key = { _, entry -> "hid:${entry.key}" },
+                            contentType = { _, _ -> "hidden" },
                         ) { hiddenIndex, (key, label) ->
                             val unhide = stringResource(R.string.settings_customize_unhide)
                             StageSettingRow(
@@ -354,7 +355,7 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     if (rows.isEmpty()) {
                         item { StageSettingsNote(stringResource(R.string.settings_customize_empty), null) }
                     }
-                    itemsIndexed(rows, key = { _, r -> r.key }) { index, row ->
+                    itemsIndexed(rows, key = { _, r -> r.key }, contentType = { _, _ -> "category" }) { index, row ->
                         val inMoveRange = rangeAnchorKey != null && rangeMode == SpanSelector.Mode.MOVE
                         val inRenameRange = rangeAnchorKey != null && rangeMode == SpanSelector.Mode.RENAME
                         val isInSpan = row.key in rangeSelectedKeys || renaming?.key == row.key || deletingCategory?.key == row.key

@@ -114,13 +114,21 @@ private fun SearchIntent.displayLabel(): String = stringResource(
 )
 
 /** One line of the results column: a group heading, a result, or the "All n channels" row. */
-private sealed interface Entry {
-    val key: String
+private sealed interface Entry {    val key: String
     data class Heading(val text: String, override val key: String) : Entry
     data class Channel(val row: ChannelSearchResult) : Entry { override val key = "c${row.channel.id}" }
     data class Movie(val movie: MovieEntity) : Entry { override val key = "m${movie.id}" }
     data class Series(val series: SeriesEntity) : Entry { override val key = "s${series.id}" }
     data class AllChannels(val count: Int) : Entry { override val key = "all-channels" }
+}
+
+/** Lazy-list content type per row kind, so a heading never recomposes as a result row and back. */
+private fun entryType(e: Entry): String = when (e) {
+    is Entry.Heading -> "heading"
+    is Entry.Channel -> "channel"
+    is Entry.Movie -> "movie"
+    is Entry.Series -> "series"
+    is Entry.AllChannels -> "all"
 }
 
 /** All shows the first four channels, then the "All n channels" row, so movies are always on screen. */
@@ -339,7 +347,7 @@ fun SearchScreen(
                     .focusGroup(),
                 verticalArrangement = Arrangement.spacedBy(8.mpx),
             ) {
-                itemsIndexed(entries, key = { _, e -> e.key }) { i, e ->
+                itemsIndexed(entries, key = { _, e -> e.key }, contentType = { _, e -> entryType(e) }) { i, e ->
                     val rowModifier = Modifier
                         .focusRequester(requesterFor(e.key))
                         .onFocusChanged { if (it.isFocused) focusedKey = e.key }
