@@ -7,6 +7,11 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
+## v5.4.1 — 2026-10-12
+
+### 🐛 Fixes
+- **📺 The app no longer crashes on startup when no playlist is set up**
+
 ## v5.4.0 — 2026-10-12
 
 ### ✨ New features
