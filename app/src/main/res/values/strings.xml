@@ -35,5 +35,9 @@
     <string name="settings_bulk_import_default_portal">Portal %1$d</string>
     <!-- A failed server and why. %1$s = server name, %2$s = reason. -->
     <string name="settings_bulk_import_failure_line">%1$s — %2$s</string>
+    <!-- Bulk import scope picker: what every server created by the import syncs. -->
+    <string name="settings_bulk_import_scope_title">Choose what to import</string>
+    <string name="settings_bulk_import_live_only">Live channels only</string>
+    <string name="settings_bulk_import_with_vod">Channels + VOD</string>
     <string name="settings_bulk_import_format_hint">Expected one server per line, e.g. “xtream;Name;http://host:port;user;pass”, “stalker;Name;http://portal;00:1A:79:AA:BB:CC”, or an Xtream URL like “http://host:port/get.php?username=user&amp;password=pass”. Importing replaces the existing playlists.</string>
 </resources>
