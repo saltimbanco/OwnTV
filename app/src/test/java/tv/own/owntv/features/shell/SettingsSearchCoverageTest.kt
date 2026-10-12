@@ -155,8 +155,11 @@ class SettingsSearchCoverageTest {
         "settings_sources_test_title", "player_subtitles_sign_in_title", "settings_open_subtitles_setup_title",
         "settings_panel_width_dialog_title", "settings_panel_width_disable_preview_title",
         "settings_record_watching_warning_title",
-        // Bulk server import: progress/result/error dialog headings, not settings.
+        // Bulk server import: progress/result/error dialog headings and the scope picker
+        // options, not settings.
         "settings_bulk_import_title", "settings_bulk_import_done", "settings_bulk_import_parse_error",
+        "settings_bulk_import_scope_title", "settings_bulk_import_live_only",
+        "settings_bulk_import_with_vod",
     )
 
     @Test
