@@ -104,6 +104,10 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
     // Bulk server-list import: a plain-text file with one Xtream/Stalker server per line.
     // The text is read here (the view model holds no Context) and handed over parsed-ready.
+    // bulkLiveOnly is the scope picker's choice (false = Channels + VOD, the current behavior);
+    // it applies to every server the import creates.
+    var bulkLiveOnly by remember { mutableStateOf(false) }
+    var showBulkScope by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val ioScope = rememberCoroutineScope()
     val pickServerList = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -119,6 +123,7 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 defaultServerName = { res.getString(R.string.settings_bulk_import_default_server, it) },
                 defaultPortalName = { res.getString(R.string.settings_bulk_import_default_portal, it) },
                 fileLabel = uri?.lastPathSegment.orEmpty(),
+                liveOnly = bulkLiveOnly,
             )
         }
     }
@@ -324,7 +329,7 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     )
                     tv.own.owntv.ui.stage.StageTool(
                         stringResource(R.string.settings_sources_import_file),
-                        onClick = { pickServerList.launch(arrayOf("text/plain")) },
+                        onClick = { showBulkScope = true },
                         icon = tv.own.owntv.ui.components.OwnTVIcon.PLAYLIST, boxed = true,
                     )
                 },
@@ -385,6 +390,14 @@ fun ManageSourcesScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         // Bulk server-list import progress and result. A bulk run keeps going behind this page,
         // so leaving mid-run strands it with no way back to its result — the running dialog
         // cannot be dismissed, only cancelled (Back is swallowed above while it runs).
+        if (showBulkScope && bulkImport is SettingsViewModel.BulkImportUi.Idle) {
+            BulkImportScopeDialog(
+                liveOnly = bulkLiveOnly,
+                onSelect = { bulkLiveOnly = it },
+                onImport = { showBulkScope = false; pickServerList.launch(arrayOf("text/plain")) },
+                onDismiss = { showBulkScope = false },
+            )
+        }
         if (bulkImport !is SettingsViewModel.BulkImportUi.Idle) {
             BulkImportDialogs(
                 bulk = bulkImport,
@@ -684,6 +697,44 @@ internal fun SourceTestDialog(
             }
             is SourceTestUi.Done -> SourceTestReport(state.result, state.limit)
         }
+    }
+}
+
+/**
+ * Bulk server-list import scope picker, shown when the import is launched (not per-source):
+ * "Live channels only" syncs live now and leaves movies/series Off on every server the import
+ * creates; "Channels + VOD" keeps the current behavior. The choice persists while this screen
+ * is open and defaults to Channels + VOD. Focus starts on the current choice.
+ */
+@Composable
+private fun BulkImportScopeDialog(
+    liveOnly: Boolean,
+    onSelect: (Boolean) -> Unit,
+    onImport: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(60); runCatching { focus.requestFocus() } }
+    tv.own.owntv.ui.stage.StagePopup(
+        onDismiss = onDismiss,
+        title = stringResource(R.string.settings_bulk_import_scope_title),
+        buttons = {
+            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.common_cancel), onClick = onDismiss, height = 56.mpx, textSize = 19)
+            tv.own.owntv.ui.stage.StageButton(stringResource(R.string.settings_sources_import_file), onClick = onImport, height = 56.mpx, textSize = 19, tinted = true)
+        },
+    ) {
+        tv.own.owntv.ui.stage.StagePopupOption(
+            title = stringResource(R.string.settings_bulk_import_live_only),
+            onClick = { onSelect(true) },
+            modifier = if (liveOnly) Modifier.focusRequester(focus) else Modifier,
+            leading = { focused -> tv.own.owntv.ui.stage.StagePopupRadio(on = liveOnly, focused = focused) },
+        )
+        tv.own.owntv.ui.stage.StagePopupOption(
+            title = stringResource(R.string.settings_bulk_import_with_vod),
+            onClick = { onSelect(false) },
+            modifier = if (!liveOnly) Modifier.focusRequester(focus) else Modifier,
+            leading = { focused -> tv.own.owntv.ui.stage.StagePopupRadio(on = !liveOnly, focused = focused) },
+        )
     }
 }
 
