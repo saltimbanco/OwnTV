@@ -1168,8 +1168,8 @@ class LiveViewModel(
                 if (!liveOnExo.value && previewEngine.currentUrl != null) previewEngine.setMuted(!on)
             }
         }
-        // Cross-playlist failover: hop to the same channel elsewhere when the stream is interrupted.
-        startFailoverWatcher()
+        // Cross-playlist failover: the watcher starts in the second init block below, after the
+        // failover state it combines exists (see startFailoverWatcher).
         viewModelScope.launch { player.archiveEnded.collect { continueAfterCatchup() } }
         viewModelScope.launch { player.archiveStalled.collect { liveAfterStall() } }
         // T17 / decision 5: on a 2 GB TV the preview pane decodes at most 720p — a second full-size
@@ -1241,6 +1241,13 @@ class LiveViewModel(
 
     /** The shell sets this: failover only drives the fullscreen live player, never the preview pane. */
     private val _fullscreenLive = MutableStateFlow(false)
+
+    // The failover watcher combines the state declared just above, so it can only start here — after
+    // these initializers. viewModelScope is Main.immediate, so a collector launched from the first
+    // init block starts inline during construction and would combine a still-null _fullscreenLive
+    // (NPE in combine, crashing the shell the moment it composes — every fresh v5.4.0 start).
+    init { startFailoverWatcher() }
+
     fun setFullscreenLive(fullscreen: Boolean) {
         _fullscreenLive.value = fullscreen
         if (!fullscreen) cancelFailover()
