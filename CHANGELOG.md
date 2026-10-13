@@ -7,15 +7,9 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
-## v5.4.1 — 2026-10-12
-
-### 🐛 Fixes
-- **📺 The app no longer crashes on startup when no playlist is set up**
-
-## v5.4.0 — 2026-10-12
+## Unreleased
 
 ### ✨ New features
-- **🗂️ Bulk import: live channels only, or channels plus VOD**
 - **↩️ Restore a category, or the playlists shown, to the playlist default** (community PR #235 by @tvdev-android)
 - **🔄 "Stream interrupted. Reconnecting…" while a live channel recovers** (community PR #237 by @tvdev-android)
 - **🖼️ Title art in Home's trending banner**
@@ -60,6 +54,16 @@
 - **💥 Error log and Backup & Restore no longer close the app on a 24-hour clock**
 - **⏯️ The remote's Play/Pause key pauses and resumes again**
 - **🔎 Search finds "Spider-Man" from "Spider-M" and lists every match, not the first 40**
+
+## v5.4.1 — 2026-10-12
+
+### 🐛 Fixes
+- **📺 The app no longer crashes on startup when no playlist is set up**
+
+## v5.4.0 — 2026-10-12
+
+### ✨ New features
+- **🗂️ Bulk import: live channels only, or channels plus VOD**
 
 ## v5.1.0 — 2026-10-04
 
