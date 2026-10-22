@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -1256,6 +1257,12 @@ class LiveViewModel(
 
     private var failoverJob: Job? = null
 
+    /**
+     * The channel whose latest incident gave up on hopping: the watchdog does not re-arm against it
+     * — the same silent channel would restart the walk forever — until the user tunes again.
+     */
+    private var failoverExhaustedChannelId: Long = -1L
+
     /** The shell sets this: failover only drives the fullscreen live player, never the preview pane. */
     private val _fullscreenLive = MutableStateFlow(false)
 
@@ -1282,8 +1289,12 @@ class LiveViewModel(
             }.collect { failed ->
                 if (failed == null || _failoverActive.value) return@collect
                 val (channel, _) = failed
-                // The engine surfaces the error once its own ladder gives up; a beat later it is
-                // still there (not a flicker) and the user has not moved on — hop.
+                onFailoverAttempt(channel.id)
+                // The engine surfaces the error once its own ladder gives up — one surfaced failure
+                // per attempt on the stream — and the stream does not hop before the failures the
+                // "Retries before switching server" row has already allowed to pass.
+                if (failoverErrorStreak <= FailoverPrefs.getRetries(appContext)) return@collect
+                // A beat later it is still there (not a flicker) and the user has not moved on — hop.
                 delay(FAILOVER_TRIGGER_DELAY_MS)
                 if (_failoverActive.value || !_fullscreenLive.value) return@collect
                 if (_previewChannel.value?.id != channel.id || activeEngineError() == null) return@collect
@@ -1292,16 +1303,100 @@ class LiveViewModel(
         }
     }
 
+    /**
+     * The second trigger, ported from the mobile app's tuner (LiveTuner's never-started watchdog):
+     * a channel whose picture is not up [FAILOVER_WATCHDOG_MS] after it came up fullscreen hops, the
+     * way the phone hops. "Not producing playback" covers the dead channel that opened fine and then
+     * quietly loads forever — the black screen it holds looks exactly like a working one — and it
+     * covers the attempt that has already surfaced an error: the hop must still happen on the very
+     * first failed tune, not only after the retries row's later attempts. Any change — a new tune,
+     * catch-up, leaving fullscreen — cancels the window instead of ticking against a channel the
+     * user is no longer watching, and an external player's channel is left entirely alone.
+     */
+    init {
+        viewModelScope.launch {
+            combine(_fullscreenLive, _previewChannel, _catchupActive) { full, channel, catchup ->
+                // The fullscreen live player is what shows a channel — the preview pane has neither
+                // the trigger to ask for help nor a hop to ask for.
+                if (full && !catchup) channel else null
+            }.collectLatest { armed ->
+                if (armed == null) return@collectLatest
+                delay(FAILOVER_WATCHDOG_MS)
+                onFailoverWatchdog(armed)
+            }
+        }
+    }
+
+    private suspend fun onFailoverWatchdog(armed: ChannelEntity) {
+        if (_failoverActive.value || !_fullscreenLive.value) return
+        val current = _previewChannel.value ?: return
+        if (current.id != armed.id) return
+        // A channel handed to an external player never plays here — its silence is not a dead stream.
+        if (externalPlayerOn.value) return
+        if (_previewChannel.value?.id == failoverExhaustedChannelId) return
+        if (liveIsProducingPlayback()) return
+        // An engine error standing does not defer the hop to the error watcher: the very first
+        // attempt that fails gets its hop now, the way the phone's tuner does it. The error watcher
+        // still owns the later failures on a channel that ONCE played — its streak is what hops.
+        startFailover(armed)
+    }
+
+    /**
+     * Whether the live stream on screen is actually **producing** playback — not merely opened. The
+     * same test the mobile tuner applies, as far as this fork's pinned core (1.0.67) allows: a dead
+     * channel that opens fine and then sits loading forever has a URL and no error, so "has a
+     * stream" or "is buffering" can never count as playing.
+     *
+     * ExoPlayer answers with its PLAYING state (it survives a pause), exactly like the phone. core
+     * 1.0.67's mpv player has no latched started signal — the phone reads `playbackStarted`, which
+     * landed in core 1.0.68 — so mpv answers with `isPlaying` alone. The one corner that buys is a
+     * user pause landing inside the five-second window (a tune five seconds old is not usually being
+     * paused) reading as an un-started stream and hopping; without the phone's signal there is no
+     * way to tell a pause from a never-loaded stream on this core, and the never-loaded stream is
+     * the case the watchdog exists for.
+     */
+    private fun liveIsProducingPlayback(): Boolean =
+        if (liveOnExo.value) {
+            previewEngine.error.value == null &&
+                previewEngine.state.value == tv.own.owntv.player.LivePreviewEngine.State.PLAYING
+        } else {
+            player.error.value == null && player.isPlaying.value
+        }
+
     private fun cancelFailover() {
         failoverJob?.cancel()
         failoverJob = null
         if (_failoverActive.value) _failoverActive.value = false
     }
 
+    /** Clear what [failoverExhaustedChannelId] marked: the user tuning again runs a fresh incident. */
+    private fun markFailoverExhausted(channelId: Long) {
+        failoverExhaustedChannelId = channelId
+    }
+
     /** Manual tunes win over a hop in flight — the user is already somewhere else. */
     fun cancelFailoverForManualTune() = cancelFailover()
 
+    /**
+     * How many times the stream on screen has failed: the count the "Retries before switching
+     * server" row reads. Attempts on one channel are counted together the way the mobile tuner
+     * counts them, and the hop begins once the stream has failed more times than that setting
+     * allows. A different channel is a different stream — its count starts at zero.
+     */
+    private fun onFailoverAttempt(channelId: Long) {
+        if (channelId != failoverErrorChannelId) {
+            failoverErrorChannelId = channelId
+            failoverErrorStreak = 0
+        }
+        failoverErrorStreak++
+    }
+
+    /** The channel the failed-attempt streak counts, and how many failures it has seen. */
+    private var failoverErrorChannelId = -1L
+    private var failoverErrorStreak = 0
+
     private fun startFailover(interrupted: ChannelEntity) {
+        if (!FailoverPrefs.isEnabled(appContext)) return
         cancelFailover()
         _failoverActive.value = true
         failoverJob = viewModelScope.launch {
@@ -1331,6 +1426,9 @@ class LiveViewModel(
                 }
                 _failoverExhausted.tryEmit(FailoverExhausted(interrupted.name))
             } finally {
+                // Every way this incident ended — exhausted, satisfied by a hop, or overtaken — stops
+                // the watchdog from arming against the interrupted channel again on its own.
+                markFailoverExhausted(interrupted.id)
                 _failoverActive.value = false
             }
         }
@@ -1699,7 +1797,18 @@ class LiveViewModel(
      *  channel. Direct-tune's background rebuild path calls this without cancelling the rebuild
      *  so the in-flight rebuild it owns isn't killed by its own play. */
     private suspend fun playChannel(channel: ChannelEntity, fromFailover: Boolean = false) {
-        if (!fromFailover) cancelFailover() // a deliberate tune supersedes a hop in flight
+        if (!fromFailover) {
+            cancelFailover() // a deliberate tune supersedes a hop in flight
+            // A deliberate tune clears the exhausted marker: the watchdog collects its own incident again.
+            failoverExhaustedChannelId = -1L
+            // The attempt streak follows the channel: tuning a different channel starts a fresh
+            // count (a deliberate tune of the same one carries it, so the user re-picking a dead
+            // channel walks the retries to the hop — that is what the mobile incidents count).
+            if (channel.id != failoverErrorChannelId) {
+                failoverErrorChannelId = channel.id
+                failoverErrorStreak = 0
+            }
+        }
         val pid = currentProfileId() ?: return
         if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, channel.categoryId, profileDao, categoryDao) || customize.sealsCategory(pid, channel.categoryId)) return
         // Live TV set to play externally: hand the channel over instead of tuning an in-app engine.
@@ -2330,6 +2439,10 @@ class LiveViewModel(
 
         /** How long each hopped match gets to start playing before the hop moves to the next one. */
         const val FAILOVER_CANDIDATE_TIMEOUT_MS = 25_000L
+
+        /** How long a channel that never started gets to produce either a stream or an error before
+         *  the never-started watchdog hops on its behalf (the mobile tuner's five-second window). */
+        const val FAILOVER_WATCHDOG_MS = 5_000L
 
     }
 }
