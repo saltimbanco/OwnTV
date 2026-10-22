@@ -34,6 +34,8 @@
 1	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	#BDBDBD
 1	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	#FFEB3B
 2	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	#FFFFFF
+3	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	vp_server_hop
+4	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	vp_server_hop_retries
 1	app/src/main/java/tv/own/owntv/features/shell/components/MediaDetailsScreen.kt	\0
 1	app/src/main/java/tv/own/owntv/ui/components/ColorPicker.kt	#%06X
 1	app/src/main/java/tv/own/owntv/ui/components/TextInputDialog.kt	\0

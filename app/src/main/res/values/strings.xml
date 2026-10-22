@@ -30,6 +30,12 @@
     </plurals>
     <!-- %1$s = file name. -->
     <string name="settings_bulk_import_unreadable_file">Could not read %1$s</string>
+    <plurals name="settings_bulk_import_skipped">
+        <item quantity="one">%1$d line skipped</item>
+        <item quantity="other">%1$d lines skipped</item>
+    </plurals>
+    <string name="settings_bulk_import_skipped_line">Line %1$d — %2$s</string>
+    <string name="settings_bulk_import_skipped_duplicate">Duplicate of line %1$d — same login or MAC</string>
     <!-- Default display names for servers/portals the file does not name. %1$d = running number. -->
     <string name="settings_bulk_import_default_server">Server %1$d</string>
     <string name="settings_bulk_import_default_portal">Portal %1$d</string>
@@ -39,5 +45,15 @@
     <string name="settings_bulk_import_scope_title">Choose what to import</string>
     <string name="settings_bulk_import_live_only">Live channels only</string>
     <string name="settings_bulk_import_with_vod">Channels + VOD</string>
+    <!-- Cross-playlist failover (the Live tuning rows, ported from the mobile app's server hop). -->
+    <string name="settings_server_hop">Switch server on interruption</string>
+    <string name="settings_server_hop_description">When a live channel keeps failing — or will not start playing at all — try the same channel on your other playlists.</string>
+    <string name="settings_server_hop_retries">Retries before switching server</string>
+    <string name="settings_server_hop_retries_description">Failed attempts on the same stream before the same channel is tried on the next playlist.</string>
+    <plurals name="settings_server_hop_retries_attempts">
+        <item quantity="zero">The first failure</item>
+        <item quantity="one">%1$d failed attempt</item>
+        <item quantity="other">%1$d failed attempts</item>
+    </plurals>
     <string name="settings_bulk_import_format_hint">Expected one server per line, e.g. “xtream;Name;http://host:port;user;pass”, “stalker;Name;http://portal;00:1A:79:AA:BB:CC”, or an Xtream URL like “http://host:port/get.php?username=user&amp;password=pass”. Importing replaces the existing playlists.</string>
 </resources>

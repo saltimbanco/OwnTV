@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +45,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.database.entity.FOLLOW_GLOBAL_LATENCY_SECS
 import tv.own.owntv.R
+import tv.own.owntv.features.live.FailoverPrefs
 import tv.own.owntv.core.settings.SubtitleStyle
 import tv.own.owntv.player.ZoomMode
 import tv.own.owntv.player.alignment
@@ -135,6 +137,7 @@ internal fun videoSectionCounts(vm: SettingsViewModel): List<Int> {
     val livePreview by vm.livePreviewEnabled.collectAsStateWithLifecycle()
     val timeshift by vm.timeshiftEnabled.collectAsStateWithLifecycle()
     val multiview by vm.multiviewEnabled.collectAsStateWithLifecycle()
+    val failoverOn = FailoverPrefs.isEnabled(LocalContext.current)
     val perPlaylist = sources.isNotEmpty()
     return listOf(
         6 + (if (perPlaylist) 2 else 0),
@@ -142,7 +145,9 @@ internal fun videoSectionCounts(vm: SettingsViewModel): List<Int> {
         3,
         3,
         4 + (if (livePreview) 1 else 0) + (if (timeshift) 1 else 0),
-        3 + (if (perPlaylist) 3 else 0),
+        // The hop switch, its retries row (which shows only while the switch is on), and the three
+        // live-tuning rows plus their per-playlist overrides.
+        4 + (if (failoverOn) 1 else 0) + (if (perPlaylist) 3 else 0),
         2,
         2 + (if (multiview) 1 else 0),
         8, 3, 2, 2,
@@ -217,6 +222,8 @@ internal val VIDEO_QUICK_ROWS: List<VideoQuickRef> = listOf(
     VideoQuickRef("vp_preroll", SECTION_LIVE_TUNING, OwnTVIcon.LIVE_TV, R.string.settings_live_preroll, R.string.settings_live_preroll_description),
     VideoQuickRef("vp_preroll_sources", SECTION_LIVE_TUNING, OwnTVIcon.LIVE_TV, R.string.settings_live_preroll_per_playlist, R.string.settings_live_preroll_per_playlist_description),
     VideoQuickRef("vp_tune_timeout", SECTION_LIVE_TUNING, OwnTVIcon.LIVE_TV, R.string.settings_live_tune_timeout, R.string.settings_live_tune_timeout_description),
+    VideoQuickRef("vp_server_hop", SECTION_LIVE_TUNING, OwnTVIcon.LIVE_TV, R.string.settings_server_hop, R.string.settings_server_hop_description),
+    VideoQuickRef("vp_server_hop_retries", SECTION_LIVE_TUNING, OwnTVIcon.LIVE_TV, R.string.settings_server_hop_retries, R.string.settings_server_hop_retries_description),
     VideoQuickRef("vp_tune_timeout_sources", SECTION_LIVE_TUNING, OwnTVIcon.LIVE_TV, R.string.settings_live_tune_timeout_per_playlist, R.string.settings_live_tune_timeout_per_playlist_description),
     VideoQuickRef("vp_seek_step", SECTION_CONTROLS, OwnTVIcon.FORWARD, R.string.settings_seek_step, R.string.settings_seek_step_description),
     VideoQuickRef("vp_rewind_step", SECTION_CONTROLS, OwnTVIcon.REWIND, R.string.settings_live_rewind_step, R.string.settings_live_rewind_step_description),
@@ -410,6 +417,12 @@ internal fun videoQuickBinding(key: String, vm: SettingsViewModel): VideoQuickBi
             val secs by vm.liveTuneTimeoutSecs.collectAsStateWithLifecycle()
             link(if (secs <= 0) stringResource(R.string.common_never) else stringResource(R.string.settings_live_buffer_seconds, secs), secs > 0)
         }
+        "vp_server_hop" -> {
+            val context = LocalContext.current
+            val on = FailoverPrefs.isEnabled(context)
+            toggle(onOff(on), on) { FailoverPrefs.setEnabled(context, !on) }
+        }
+        "vp_server_hop_retries" -> link(FailoverPrefs.getRetries(LocalContext.current).toString())
         "vp_tune_timeout_sources" -> {
             val sources by vm.sources.collectAsStateWithLifecycle()
             val count = sources.count { it.liveTuneTimeoutSecs != null }
@@ -635,6 +648,11 @@ internal fun VideoPlayerGroupRows(
     val liveCustomSecs by vm.liveLatencyCustomSecs.collectAsStateWithLifecycle()
     val livePreroll by vm.livePrerollSecs.collectAsStateWithLifecycle()
     val liveTuneTimeout by vm.liveTuneTimeoutSecs.collectAsStateWithLifecycle()
+    // Cross-playlist failover's own two values (FailoverPrefs): app-local SharedPreferences, not
+    // core's settings store — the same additive-local arrangement the phone app keeps.
+    val failoverContext = LocalContext.current
+    var failoverOn by remember { mutableStateOf(FailoverPrefs.isEnabled(failoverContext)) }
+    var failoverRetries by remember { mutableIntStateOf(FailoverPrefs.getRetries(failoverContext)) }
     // The playback settings that also appear on the Settings root. They live here too so that Video
     // player is the one complete list; the root rows are shortcuts to the same values (item 14).
     val hdr by vm.hdrEnabled.collectAsStateWithLifecycle()
@@ -1059,6 +1077,31 @@ internal fun VideoPlayerGroupRows(
         )
                     }
                     SECTION_LIVE_TUNING -> {
+        Row2(
+            quickKey = "vp_server_hop",
+            icon = OwnTVIcon.LIVE_TV,
+            title = stringResource(R.string.settings_server_hop),
+            desc = stringResource(R.string.settings_server_hop_description),
+            chip = if (failoverOn) stringResource(R.string.common_on) else stringResource(R.string.common_off),
+            primaryChip = failoverOn,
+            // turning it OFF mid-hop is honored by the watcher itself; no other state to unwind here
+            onClick = { failoverOn = !failoverOn; FailoverPrefs.setEnabled(failoverContext, failoverOn) },
+        )
+        if (failoverOn) {
+            Row2(
+                quickKey = "vp_server_hop_retries",
+                choices = FailoverPrefs.RETRY_CHOICES.map { it.toString() },
+                chosen = FailoverPrefs.RETRY_CHOICES.indexOf(failoverRetries),
+                recommended = FailoverPrefs.RETRY_CHOICES.indexOf(FailoverPrefs.DEFAULT_RETRIES),
+                icon = OwnTVIcon.LIVE_TV,
+                title = stringResource(R.string.settings_server_hop_retries),
+                desc = stringResource(R.string.settings_server_hop_retries_description),
+                chip = failoverRetries.toString(),
+                chevron = true,
+                modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.FAILOVER_RETRIES)),
+                onClick = { savedScroll = scrollState.value; dialog = Dialog.FAILOVER_RETRIES },
+            )
+        }
         Row2(
             quickKey = "vp_live_latency",
             choices = tv.own.owntv.core.settings.LiveLatency.entries.map { stringResource(liveLatencyLabelRes(it)) }, chosen = liveLatency.ordinal, recommended = tv.own.owntv.core.settings.LiveLatency.DEFAULT.ordinal,
@@ -1799,6 +1842,17 @@ internal fun VideoPlayerGroupRows(
             onSelect = { vm.setAfrPauseSecs(it.toIntOrNull() ?: 0); dialog = Dialog.NONE },
             onDismiss = { dialog = Dialog.NONE },
         )
+        Dialog.FAILOVER_RETRIES -> PickerDialog(
+            title = stringResource(R.string.settings_server_hop_retries),
+            options = FailoverPrefs.RETRY_CHOICES.map { it.toString() to pluralStringResource(R.plurals.settings_server_hop_retries_attempts, it, it) },
+            selected = failoverRetries.toString(),
+            onSelect = {
+                failoverRetries = it.toIntOrNull() ?: FailoverPrefs.DEFAULT_RETRIES
+                FailoverPrefs.setRetries(failoverContext, failoverRetries)
+                dialog = Dialog.NONE
+            },
+            onDismiss = { dialog = Dialog.NONE },
+        )
         Dialog.LIVE_REWIND_STEP -> PickerDialog(
             title = stringResource(R.string.settings_live_rewind_step),
             options = tv.own.owntv.core.settings.SeekSteps.LIVE_REWIND_CHOICES.map {
@@ -1921,6 +1975,7 @@ private fun dialogForQuickKey(key: String): Dialog? = when (key) {
     "vp_latency_sources" -> Dialog.LIVE_LATENCY_SOURCES
     "vp_preroll" -> Dialog.LIVE_PREROLL
     "vp_tune_timeout" -> Dialog.LIVE_TUNE_TIMEOUT
+    "vp_server_hop_retries" -> Dialog.FAILOVER_RETRIES
     "vp_tune_timeout_sources" -> Dialog.LIVE_TUNE_TIMEOUT_SOURCES
     "vp_preroll_sources" -> Dialog.LIVE_PREROLL_SOURCES
     "vp_volume" -> Dialog.VOLUME
@@ -1935,7 +1990,7 @@ private fun dialogForQuickKey(key: String): Dialog? = when (key) {
     else -> null
 }
 
-private enum class Dialog { NONE, LIVE_ENGINE, LIVE_ENGINE_SOURCES, LIVE_ENGINE_SOURCE, LIVE_LATENCY_SOURCES, LIVE_LATENCY_SOURCE, LIVE_LATENCY_CUSTOM_SOURCE, VOD_ENGINE, VOD_ENGINE_SOURCES, VOD_ENGINE_SOURCE, ZOOM, VOLUME, RESET_SAVED_ZOOM, RESET_SAVED_VOLUME, RESET_SAVED_AUDIO_DELAY, SEEK_STEP, LIVE_REWIND_STEP, SUB_STYLE, SUB_LANG, AUDIO_LANG, SURROUND, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, LIVE_PREROLL, LIVE_TUNE_TIMEOUT, LIVE_TUNE_TIMEOUT_SOURCES, LIVE_TUNE_TIMEOUT_SOURCE, LIVE_PREROLL_SOURCES, LIVE_PREROLL_SOURCE, EXTERNAL_PLAYER, RESET_PINS, RESET_LIVE_PINS, FORGET_FIXES, AFR_WARNING, AFR_PAUSE, VOD_BUFFER, VOD_TIMEOUT, VOD_RECONNECTS, TIMESHIFT_WINDOW, TIMESHIFT_RESUME, MAX_QUALITY, LIVE_PREVIEW_PANEL, MINI_PLAYER, MULTIVIEW_TILES, MULTIVIEW_WARNING }
+private enum class Dialog { NONE, LIVE_ENGINE, LIVE_ENGINE_SOURCES, LIVE_ENGINE_SOURCE, LIVE_LATENCY_SOURCES, LIVE_LATENCY_SOURCE, LIVE_LATENCY_CUSTOM_SOURCE, VOD_ENGINE, VOD_ENGINE_SOURCES, VOD_ENGINE_SOURCE, ZOOM, VOLUME, RESET_SAVED_ZOOM, RESET_SAVED_VOLUME, RESET_SAVED_AUDIO_DELAY, SEEK_STEP, LIVE_REWIND_STEP, SUB_STYLE, SUB_LANG, AUDIO_LANG, SURROUND, AUDIO_SYNC, RESUME, LIVE_LATENCY, LIVE_CUSTOM, LIVE_PREROLL, LIVE_TUNE_TIMEOUT, FAILOVER_RETRIES, LIVE_TUNE_TIMEOUT_SOURCES, LIVE_TUNE_TIMEOUT_SOURCE, LIVE_PREROLL_SOURCES, LIVE_PREROLL_SOURCE, EXTERNAL_PLAYER, RESET_PINS, RESET_LIVE_PINS, FORGET_FIXES, AFR_WARNING, AFR_PAUSE, VOD_BUFFER, VOD_TIMEOUT, VOD_RECONNECTS, TIMESHIFT_WINDOW, TIMESHIFT_RESUME, MAX_QUALITY, LIVE_PREVIEW_PANEL, MINI_PLAYER, MULTIVIEW_TILES, MULTIVIEW_WARNING }
 
 /** "Auto" for 0, else seconds ("60s") — the film buffer and network timeout choices (N18). */
 @Composable

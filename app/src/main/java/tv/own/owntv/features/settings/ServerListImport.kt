@@ -4,13 +4,17 @@ package tv.own.owntv.features.settings
  * Bulk import of IPTV servers from a plain-text file (one server per line).
  *
  * Ported from the mobile app's `ServerListImport.kt`: same format, same shape-based type
- * inference. Why this exists alongside backup restore: the `.own` backup file *does* already
- * carry many sources at once (its SOURCES section), but it is a backup container, not a server
- * list — a JSON document plus assets, optionally sealed whole-file with AES-256-GCM/PBKDF2. There
- * is no way to hand the app a plain list of Xtream logins / Stalker portals and have them added.
- * This parser fills exactly that gap; each parsed entry is then added through core's regular
- * [tv.own.owntv.core.setup.SourceImporter] calls, so validation, sync and error handling stay
- * core's.
+ * inference, and its credential dedup. Why this exists alongside backup restore: the `.own`
+ * backup file *does* already carry many sources at once (its SOURCES section), but it is a backup
+ * container, not a server list — a JSON document plus assets, optionally sealed whole-file with
+ * AES-256-GCM/PBKDF2. There is no way to hand the app a plain list of Xtream logins / Stalker
+ * portals and have them added. This parser fills exactly that gap; each parsed entry is then added
+ * through core's regular [tv.own.owntv.core.setup.SourceImporter] calls, so validation, sync and
+ * error handling stay core's.
+ *
+ * Entries are deduped on their credentials: the same Xtream login (username + password) or the
+ * same Stalker MAC is imported once, however many hostnames the list publishes it under — later
+ * lines are skipped and reported as the duplicates they are.
  *
  * Format (blank lines and `#` comments ignored, fields split on `;` or `|`):
  * ```
@@ -56,9 +60,16 @@ sealed interface ServerListEntry {
 
 data class ServerListParseResult(
     val entries: List<ServerListEntry>,
-    /** `line number to reason`, for lines that were skipped. */
-    val skipped: List<Pair<Int, String>>,
+    /** Lines that produced no server: unreadable, or a duplicate of an earlier line. */
+    val skipped: List<SkippedLine>,
 )
+
+/**
+ * A line the parser did not turn into a server. [duplicateOf] marks a line that parsed fine but
+ * carries a server the list already holds: the same Xtream login or the same Stalker MAC, however
+ * different the host it is published under — one account, many mirrors, one playlist.
+ */
+data class SkippedLine(val line: Int, val text: String, val duplicateOf: Int? = null)
 
 private val MAC_PATTERN = Regex("^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
@@ -70,17 +81,41 @@ fun parseServerList(
     defaultPortalName: (Int) -> String,
 ): ServerListParseResult {
     val entries = mutableListOf<ServerListEntry>()
-    val skipped = mutableListOf<Pair<Int, String>>()
+    val skipped = mutableListOf<SkippedLine>()
+    /** Dedup key to the line number of its first occurrence. */
+    val seen = mutableMapOf<DedupKey, Int>()
     text.lineSequence().forEachIndexed { index, raw ->
         val lineNo = index + 1
         val line = raw.trim()
         if (line.isEmpty() || line.startsWith("#")) return@forEachIndexed
         val parts = line.split(';', '|').map { it.trim() }
         val entry = parseServerLine(parts, entries.size, defaultServerName, defaultPortalName)
-        if (entry != null) entries.add(entry)
-        else skipped.add(lineNo to raw.trim())
+        if (entry == null) {
+            skipped.add(SkippedLine(lineNo, line))
+            return@forEachIndexed
+        }
+        // Providers publish one account under several hostnames — a domain and its raw IP, a
+        // mirror, a "top" list and a "full working" list naming the same login. The credentials
+        // are the server's identity, not the URL: the first line carrying a login or a MAC wins
+        // and every later one is reported as the duplicate it is.
+        val first = seen.putIfAbsent(entry.dedupKey(), lineNo)
+        if (first != null) skipped.add(SkippedLine(lineNo, line, duplicateOf = first))
+        else entries.add(entry)
     }
     return ServerListParseResult(entries, skipped)
+}
+
+/** What makes an entry the same server as another: the Xtream login, or the Stalker MAC. */
+private fun ServerListEntry.dedupKey(): DedupKey = when (this) {
+    is ServerListEntry.Xtream -> DedupKey.Xtream(username, password)
+    is ServerListEntry.Stalker -> DedupKey.Stalker(mac.lowercase().filter(Char::isLetterOrDigit))
+}
+
+/** A typed identity so a lookup never turns into string concatenation. */
+private sealed interface DedupKey {
+    data class Xtream(val username: String, val password: String) : DedupKey
+    /** Separators and case dropped: `00:1A:79:AA:BB:CC` and `001a79aabbcc` are one MAC. */
+    data class Stalker(val mac: String) : DedupKey
 }
 
 private fun parseServerLine(

@@ -1467,6 +1467,8 @@ class SettingsViewModel(
         data class Done(
             val succeeded: List<String>,
             val failed: List<BulkFailure>,
+            /** Lines that produced no server: unreadable, or duplicates of an earlier line. */
+            val skipped: List<SkippedLine> = emptyList(),
         ) : BulkImportUi
         data class ParseError(val reason: BulkParseReason, val lines: Int = 0, val label: String = "") : BulkImportUi
     }
@@ -1601,7 +1603,7 @@ class SettingsViewModel(
                 importer.reset()
             }
             runCatching { refreshActiveTvHome(allowBrowsableRequest = true) }
-            _bulkImport.value = BulkImportUi.Done(succeeded, failed)
+            _bulkImport.value = BulkImportUi.Done(succeeded, failed, parsed.skipped)
         }.also { job ->
             job.invokeOnCompletion { if (bulkImportJob == job) bulkImportJob = null }
         }

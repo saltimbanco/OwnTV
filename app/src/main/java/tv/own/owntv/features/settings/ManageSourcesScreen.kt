@@ -782,6 +782,25 @@ private fun BulkImportDialogs(
             Column(verticalArrangement = Arrangement.spacedBy(8.mpx)) {
                 Text(pluralStringResource(R.plurals.settings_bulk_import_added, bulk.succeeded.size, bulk.succeeded.size), style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
                 Text(pluralStringResource(R.plurals.settings_bulk_import_failed, bulk.failed.size, bulk.failed.size), style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
+                if (bulk.skipped.isNotEmpty()) {
+                    Text(pluralStringResource(R.plurals.settings_bulk_import_skipped, bulk.skipped.size, bulk.skipped.size), style = line, color = tv.own.owntv.ui.theme.StageColors.Muted)
+                    bulk.skipped.forEach { skipped ->
+                        Text(
+                            text = stringResource(R.string.settings_bulk_import_skipped_line, skipped.line, skipped.text),
+                            style = tv.own.owntv.ui.theme.stageText(16, 500),
+                            color = tv.own.owntv.ui.theme.StageColors.Muted,
+                        )
+                        // A line that parsed fine but named an account the file already listed: the
+                        // same login or MAC — the host it repeats is the only thing that differed.
+                        if (skipped.duplicateOf != null) {
+                            Text(
+                                text = stringResource(R.string.settings_bulk_import_skipped_duplicate, skipped.duplicateOf),
+                                style = tv.own.owntv.ui.theme.stageText(14, 500),
+                                color = tv.own.owntv.ui.theme.StageColors.Muted,
+                            )
+                        }
+                    }
+                }
                 bulk.failed.forEach { failure ->
                     val reason = failure.friendly().displayText().takeIf { it.isNotBlank() }
                         ?: failure.detail.orEmpty()
