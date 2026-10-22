@@ -117,12 +117,6 @@ private fun PageHead(title: String, trailing: @Composable RowScope.() -> Unit = 
     }
 }
 
-/** A dim caps heading inside a page ("WHAT'S INCLUDED"). */
-@Composable
-internal fun PageLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]), style = stageText(13, 800, 0.13.em), color = StageColors.Dim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
-}
-
 /** `.tool.box` on a focused row ("▶ Resume", "✕ Remove"): 44 high, 16/700. */
 data class RowAction(val text: String, val icon: OwnTVIcon, val onClick: () -> Unit)
 
@@ -204,11 +198,11 @@ private fun EmptyNote(title: String, body: String? = null) {
 private fun counted(nameRes: Int, n: Int) = stringResource(nameRes) + " " + n
 
 // ---------------------------------------------------------------------------------------------
-// Settings (P8-01): Search and the twelve group cards
+// Settings: Search and the twelve group cards
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The twelve Settings groups (P10), in the order of `SettingsGroup`: a card's index is the group it opens.
+ * The twelve Settings groups, in the order of `SettingsGroup`: a card's index is the group it opens.
  */
 private data class SettingsGroupCard(val icon: OwnTVIcon, val nameRes: Int, val summaryRes: Int, val count: Int?)
 
@@ -219,9 +213,9 @@ private val SettingsCards = listOf(
     SettingsGroupCard(OwnTVIcon.PALETTE, R.string.settings_group_appearance, R.string.settings_card_appearance, 9),
     SettingsGroupCard(OwnTVIcon.GRID, R.string.settings_group_layout, R.string.settings_card_layout, 10),
     SettingsGroupCard(OwnTVIcon.MOVIES, R.string.settings_group_content_metadata, R.string.settings_card_content, 3),
-    SettingsGroupCard(OwnTVIcon.PLAY_CIRCLE, R.string.settings_vp_cat_player, R.string.settings_card_player, 11),
+    SettingsGroupCard(OwnTVIcon.PLAY_CIRCLE, R.string.settings_vp_cat_player, R.string.settings_card_player, 10),
     SettingsGroupCard(OwnTVIcon.EXPAND, R.string.settings_vp_cat_picture, R.string.settings_card_picture, 9),
-    SettingsGroupCard(OwnTVIcon.HEADPHONES, R.string.settings_group_sound_subtitles, R.string.settings_card_sound, 11),
+    SettingsGroupCard(OwnTVIcon.HEADPHONES, R.string.settings_group_sound_subtitles, R.string.settings_card_sound, 12),
     SettingsGroupCard(OwnTVIcon.LIVE_TV, R.string.settings_live_tv, R.string.settings_card_live, 12),
     SettingsGroupCard(OwnTVIcon.REC, R.string.settings_group_watching_recording, R.string.settings_card_watching, 11),
     SettingsGroupCard(OwnTVIcon.INFO, R.string.settings_group_app, R.string.settings_card_app, 10),
@@ -280,7 +274,7 @@ internal fun SettingsPage(entry: FocusRequester, pinned: Int, onOpenGroup: (Int)
 }
 
 // ---------------------------------------------------------------------------------------------
-// Favourites (P8-03)
+// Favourites
 // ---------------------------------------------------------------------------------------------
 
 private enum class FavFilter { ALL, LIVE, MOVIES, SERIES }
@@ -334,7 +328,7 @@ internal fun FavouritesPage(
                 modifier = Modifier.focusRequester(segFocus),
             )
         }
-        androidx.compose.runtime.SideEffect { setEntry { runCatching { firstTarget.requestFocus() }.isSuccess } }
+        androidx.compose.runtime.SideEffect { setEntry { runCatching { firstTarget.requestFocus() }.getOrDefault(false) } }
         if (counts.total == 0) {
             EmptyNote(stringResource(R.string.more_fav_empty_title), stringResource(R.string.more_fav_empty_body))
             return@Column
@@ -407,8 +401,7 @@ internal fun FavouritesPage(
             title = stringResource(R.string.content_move),
             itemNames = m.names,
             activeIndex = m.index,
-            onMoveUp = { vm.moveBy(-1) },
-            onMoveDown = { vm.moveBy(1) },
+            onMove = vm::move,
             onCommit = vm::commitMove,
             onCancel = vm::cancelMove,
         )
@@ -425,7 +418,7 @@ private fun RowHead(title: String, small: String?, top: Dp) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// History (P8-04)
+// History
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -478,7 +471,7 @@ internal fun HistoryPage(
             Spacer(Modifier.weight(1f))
             if (counts.total > 0) StageTool(stringResource(R.string.settings_clear_history), onClick = { showClear = true }, icon = OwnTVIcon.TRASH, danger = true, modifier = Modifier.focusRequester(clearFocus))
         }
-        androidx.compose.runtime.SideEffect { setEntry { runCatching { (rows.firstOrNull()?.let { r -> focusOf(r.id) } ?: segFocus).requestFocus() }.isSuccess } }
+        androidx.compose.runtime.SideEffect { setEntry { runCatching { (rows.firstOrNull()?.let { r -> focusOf(r.id) } ?: segFocus).requestFocus() }.getOrDefault(false) } }
         if (rows.isEmpty()) {
             EmptyNote(stringResource(R.string.more_history_empty))
             return@Column
@@ -487,7 +480,7 @@ internal fun HistoryPage(
             items(rows, key = { it.type.name + it.id }) { e ->
                 val left = when {
                     e.durationMs > 0 && e.positionMs > 0 -> timeLeftText(((e.durationMs - e.positionMs).coerceAtLeast(0L) + 59_999L) / 60_000L)
-                    // "0:14 watched": hours and minutes, as the mockup writes it.
+                    // "0:14 watched": hours and minutes.
                     e.positionMs > 0 -> (e.positionMs / 60_000L).let { m -> stringResource(R.string.content_watched_duration, String.format(androidx.compose.ui.platform.LocalConfiguration.current.locales[0], "%d:%02d", m / 60, m % 60)) }
                     else -> null
                 }
@@ -539,7 +532,7 @@ internal fun HistoryPage(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Error log (P8-07)
+// Error log
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -577,7 +570,7 @@ internal fun ErrorLogPage(setEntry: (() -> Boolean) -> Unit, onCountChanged: () 
                 runCatching { exportFocus.requestFocus() }
             })
         }
-        androidx.compose.runtime.SideEffect { setEntry { runCatching { (if (entries.isNullOrEmpty()) exportFocus else firstRow).requestFocus() }.isSuccess } }
+        androidx.compose.runtime.SideEffect { setEntry { runCatching { (if (entries.isNullOrEmpty()) exportFocus else firstRow).requestFocus() }.getOrDefault(false) } }
         Text(stringResource(R.string.settings_playback_error_description_full), style = stageText(17, 500), color = StageColors.Muted, modifier = Modifier.padding(top = 10.mpx))
         exportPath?.let { Text(stringResource(R.string.settings_backup_saved_to, it), style = stageText(16, 500), color = stageAccent.accent, modifier = Modifier.padding(top = 8.mpx)) }
         if (exportFailed) Text(stringResource(R.string.settings_backup_export_error), style = stageText(16, 500), color = StageColors.Danger, modifier = Modifier.padding(top = 8.mpx))
@@ -628,7 +621,7 @@ internal fun ErrorLogPage(setEntry: (() -> Boolean) -> Unit, onCountChanged: () 
 }
 
 // ---------------------------------------------------------------------------------------------
-// About (P8-08)
+// About
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -646,7 +639,7 @@ internal fun AboutPage(vm: MoreCountsViewModel, entry: FocusRequester, onOpenLan
 
     Column(Modifier.fillMaxSize().focusGroup()) {
         Row(horizontalArrangement = Arrangement.spacedBy(40.mpx), verticalAlignment = Alignment.CenterVertically) {
-            // The app's own icon (150) and the #227 wordmark (300).
+            // The app's own icon (150) and the wordmark (300).
             BrandMark(rememberAppliedIcon(), 150.mpx)
             Column {
                 Wordmark(300.mpx)

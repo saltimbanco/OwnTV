@@ -50,7 +50,7 @@ import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
 /**
- * Settings › Appearance's LIVE PREVIEW (P9-04, G9): a small Home drawn from the first Trending title, at a
+ * Settings › Appearance's LIVE PREVIEW: a small Home drawn from the first Trending title, at a
  * third of the screen's size. Not a second Home — no data of its own, nothing focusable — but it draws
  * with the live accent, focus colour, glass and font, so a change shows here before the row is left.
  */
