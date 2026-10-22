@@ -1288,13 +1288,13 @@ class LiveViewModel(
 
     /**
      * The second trigger, ported from the mobile app's tuner (LiveTuner's never-started watchdog):
-     * a channel that sits silent instead of erroring — it opened fine and then loads forever, the
-     * black screen such a channel holds looks exactly like a working one — gets
-     * [FAILOVER_WATCHDOG_MS] from the moment it came up fullscreen. When that window closes on the
-     * same channel, still not producing playback and with no engine error (the error watcher owns
-     * that hop), it hops. Any change — a new tune, catch-up, leaving fullscreen — cancels the
-     * window instead of ticking against a channel the user is no longer watching. An external
-     * player owns the stream then, so nothing here is armed for one.
+     * a channel whose picture is not up [FAILOVER_WATCHDOG_MS] after it came up fullscreen hops, the
+     * way the phone hops. "Not producing playback" covers the dead channel that opened fine and then
+     * quietly loads forever — the black screen it holds looks exactly like a working one — and it
+     * covers the attempt that has already surfaced an error: the hop must still happen on the very
+     * first failed tune, not only after the retries row's later attempts. Any change — a new tune,
+     * catch-up, leaving fullscreen — cancels the window instead of ticking against a channel the
+     * user is no longer watching, and an external player's channel is left entirely alone.
      */
     init {
         viewModelScope.launch {
@@ -1317,8 +1317,10 @@ class LiveViewModel(
         // A channel handed to an external player never plays here — its silence is not a dead stream.
         if (externalPlayerOn.value) return
         if (_previewChannel.value?.id == failoverExhaustedChannelId) return
-        if (activeEngineError() != null) return // the error watcher owns the hop then
         if (liveIsProducingPlayback()) return
+        // An engine error standing does not defer the hop to the error watcher: the very first
+        // attempt that fails gets its hop now, the way the phone's tuner does it. The error watcher
+        // still owns the later failures on a channel that ONCE played — its streak is what hops.
         startFailover(armed)
     }
 
@@ -1326,21 +1328,22 @@ class LiveViewModel(
      * Whether the live stream on screen is actually **producing** playback — not merely opened. The
      * same test the mobile tuner applies, as far as this fork's pinned core (1.0.67) allows: a dead
      * channel that opens fine and then sits loading forever has a URL and no error, so "has a
-     * stream" alone can never be the test.
+     * stream" or "is buffering" can never count as playing.
      *
-     * ExoPlayer answers through its PLAYING state (it survives a pause), exactly like the phone.
-     * core 1.0.67's mpv player has no latched started signal — the phone reads `playbackStarted`,
-     * which landed in core 1.0.68 — so mpv is judged by `isPlaying` with `buffering` as the
-     * not-paused witness. A user pause inside the watchdog window is therefore a corner case
-     * (they tuned five seconds ago), and a stalled-but-open mpv stream turns into an error by the
-     * engine's own ladder — which the error watcher then hops on.
+     * ExoPlayer answers with its PLAYING state (it survives a pause), exactly like the phone. core
+     * 1.0.67's mpv player has no latched started signal — the phone reads `playbackStarted`, which
+     * landed in core 1.0.68 — so mpv answers with `isPlaying` alone. The one corner that buys is a
+     * user pause landing inside the five-second window (a tune five seconds old is not usually being
+     * paused) reading as an un-started stream and hopping; without the phone's signal there is no
+     * way to tell a pause from a never-loaded stream on this core, and the never-loaded stream is
+     * the case the watchdog exists for.
      */
     private fun liveIsProducingPlayback(): Boolean =
         if (liveOnExo.value) {
             previewEngine.error.value == null &&
                 previewEngine.state.value == tv.own.owntv.player.LivePreviewEngine.State.PLAYING
         } else {
-            player.error.value == null && (player.isPlaying.value || player.buffering.value)
+            player.error.value == null && player.isPlaying.value
         }
 
     private fun cancelFailover() {
