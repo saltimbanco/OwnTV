@@ -62,6 +62,7 @@
 - **⚙️ "Switch server on interruption" becomes a setting — a switch under Live tuning plus a retries count**
 - **🔑 The server list imports each login once: duplicate lines are skipped and reported in the result**
 - **🔤 Switch-server matching reads shortened, decorated and non-Latin channel names (the phone's matcher)**
+- **🗂️ Bulk import: live channels only, or channels plus VOD**
 
 ### 🍴 Fork highlights — what this app keeps beyond the upstream app
 - **🔀 Cross-playlist switch on interruption: a breaking stream hops across your playlists until one plays**
@@ -74,11 +75,6 @@
 
 ### 🐛 Fixes
 - **📺 The app no longer crashes on startup when no playlist is set up**
-
-## v5.4.0 — 2026-10-12
-
-### ✨ New features
-- **🗂️ Bulk import: live channels only, or channels plus VOD**
 
 ## v5.1.0 — 2026-10-04
 
