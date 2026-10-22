@@ -55,7 +55,7 @@
 - **⏯️ The remote's Play/Pause key pauses and resumes again**
 - **🔎 Search finds "Spider-Man" from "Spider-M" and lists every match, not the first 40**
 
-## v5.2.1 — 2026-10-22
+## v5.2.2 — 2026-10-22
 
 ### ✨ New features
 - **⏱️ No picture for five seconds: the same channel hops to the next playlist on its own**
