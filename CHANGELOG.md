@@ -7,21 +7,10 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
-## v5.2.3 — 2026-10-23
-
-### ✨ New features
-- **🏆 Sports Hub: Super League Greece — its live scores land in the hub, with standings and team pages, and the channels showing its matches turn up in the guide**
-
-### 🍴 Fork highlights — what this app keeps beyond the upstream app
-- **🔀 Cross-playlist switch on interruption: a breaking stream hops across your playlists until one plays**
-- **🗂️ Bulk server import from a plain-text file, live-only or channels-plus-VOD**
-- **⏯️ Next/previous channel buttons in the player controls**
-- **⚡ TV-tuned interface performance: Home and the guide re-render less per tick**
-- **📦 One arm APK (arm64-v8a + armeabi-v7a); no x86_64 build**
-
 ## v5.2.2 — 2026-10-22
 
 ### ✨ New features
+- **🏆 Sports Hub: Super League Greece — its live scores land in the hub, with standings and team pages, and the channels showing its matches turn up in the guide**
 - **⏱️ No picture for five seconds: the same channel hops to the next playlist on its own**
 - **⚙️ "Switch server on interruption" becomes a setting — a switch under Live tuning plus a retries count**
 - **🔑 The server list imports each login once: duplicate lines are skipped and reported in the result**
