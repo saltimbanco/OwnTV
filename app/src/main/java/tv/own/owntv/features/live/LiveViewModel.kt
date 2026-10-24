@@ -1297,7 +1297,7 @@ class LiveViewModel(
      * catch-up, leaving fullscreen — cancels the window instead of ticking against a channel the
      * user is no longer watching, and an external player's channel is left entirely alone.
      */
-    init {
+    private fun startFailoverWatchdog() {
         viewModelScope.launch {
             combine(_fullscreenLive, _previewChannel, _catchupActive) { full, channel, catchup ->
                 // The fullscreen live player is what shows a channel — the preview pane has neither
@@ -1898,6 +1898,13 @@ class LiveViewModel(
     /** Which player takes a catch-up archive — read by the UI so "Watch from start" can route itself. */
     val catchupPlayer: StateFlow<SettingsRepository.CatchupPlayer> = settings.catchupPlayer
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.CatchupPlayer.INTERNAL)
+
+    // The failover watchdog combines _fullscreenLive, _previewChannel and this _catchupActive, so it
+    // can only start here — after all of its initializers. viewModelScope is Main.immediate, so a
+    // collector launched from an init block above starts inline during construction and would combine
+    // a still-null _catchupActive (NPE in combine, crashing the shell the moment it composes — every
+    // fresh v5.2.2 start). Same trap the failover watcher start at _fullscreenLive works around.
+    init { startFailoverWatchdog() }
 
     /**
      * No archive URL could be built for what the user just picked.
