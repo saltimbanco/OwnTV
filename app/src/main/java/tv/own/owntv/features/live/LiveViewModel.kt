@@ -1211,11 +1211,11 @@ class LiveViewModel(
     }
 
     // --- Cross-playlist failover: hop to the same channel elsewhere on interruption ---------------
-    // When the fullscreen live stream is interrupted (the engine ladder gave up and surfaced an
-    // error), fuzzy-match the channel name across the profile's playlists and hop through the
-    // matches — same-playlist siblings first, then the next playlists in profile order — until one
-    // plays. Every hop raises [failoverNotice] so the popup names the playlist switch; when nothing
-    // matches or nothing plays, [failoverExhausted] leaves the engine's own error screen up.
+    // When the fullscreen live stream is not playing ten seconds after its tune (or its engine
+    // ladder gave up), fuzzy-match the channel name across every live playlist of the profile and
+    // hop through them — each other playlist once, its best match, in profile order, ten seconds
+    // each — until one plays. Every hop raises [failoverNotice] so the popup names the playlist
+    // switch; when nothing matches or nothing plays, [failoverExhausted] says so.
 
     /** One hop: which playlist the switch went to, and how far through the matches it is. */
     data class FailoverNotice(
@@ -1224,9 +1224,12 @@ class LiveViewModel(
         val toPlaylist: String?,
         val attempt: Int,
         val total: Int,
+        /** How long this match gets to play — the popup stays up that long, so the screen says which
+         *  playlist is being tried for as long as it is being tried. */
+        val windowMs: Long,
     )
 
-    /** No match, or every match failed — the interrupted channel stays on the error screen. */
+    /** No match, or every match failed: the hop stops on the last playlist it tried. */
     data class FailoverExhausted(val channelName: String)
 
     private val _failoverActive = MutableStateFlow(false)
@@ -1379,13 +1382,22 @@ class LiveViewModel(
         _failoverActive.value = true
         failoverJob = viewModelScope.launch {
             try {
-                val candidates = withContext(Dispatchers.IO) { findFailoverCandidates(interrupted) }
+                // Every live playlist of the profile, not just the one the browse screens show: with an
+                // active playlist picked ("Server 2"), the hop searched that playlist alone, found nothing
+                // to hop to, and left the channel to core's 30-second give-up.
+                val playlists = withContext(Dispatchers.IO) {
+                    currentProfileId()?.let { pid -> sourceDao.observeForProfile(pid).first().filter { it.syncLive } }
+                }.orEmpty()
+                val playlistNames = playlists.associate { it.id to it.name }
+                val candidates = withContext(Dispatchers.IO) {
+                    findFailoverCandidates(interrupted, playlists.map { it.id })
+                }
                 if (candidates.isEmpty()) {
                     failoverSpent = true
                     _failoverExhausted.tryEmit(FailoverExhausted(interrupted.name))
                     return@launch
                 }
-                val fromName = sourceNameOf(interrupted.sourceId)
+                val fromName = playlistNames[interrupted.sourceId]
                 for ((index, ranked) in candidates.withIndex()) {
                     if (!_fullscreenLive.value) return@launch
                     val target = custom.value.itemNames[CustomizeKeys.channel(ranked.channel)]
@@ -1394,9 +1406,10 @@ class LiveViewModel(
                         FailoverNotice(
                             channelName = interrupted.name,
                             fromPlaylist = fromName,
-                            toPlaylist = sourceNameOf(target.sourceId),
+                            toPlaylist = playlistNames[target.sourceId],
                             attempt = index + 1,
                             total = candidates.size,
+                            windowMs = FAILOVER_WATCHDOG_MS,
                         ),
                     )
                     zapList.armFor(target)
@@ -1421,15 +1434,18 @@ class LiveViewModel(
         }
     }
 
-    /** Fuzzy name matches across the profile's playlists, ranked to hop. Name-only: provider
+    /** Fuzzy name matches across [playlistIds] (profile order), ranked to hop. Name-only: provider
      *  remote ids and EPG ids are not comparable across playlists, so they take no part. */
-    private suspend fun findFailoverCandidates(interrupted: ChannelEntity): List<RankedFailoverCandidate> {
-        val ids = ctx.value.sourceIds.ifEmpty { return emptyList() }
+    private suspend fun findFailoverCandidates(
+        interrupted: ChannelEntity,
+        playlistIds: List<Long>,
+    ): List<RankedFailoverCandidate> {
+        if (playlistIds.isEmpty()) return emptyList()
         val pool = mutableSetOf<ChannelEntity>()
         failoverTokens(normalizeChannelName(interrupted.name)).take(4).forEach { token ->
-            runCatching { channelDao.searchList(token, ids, 50) }.getOrNull()?.let { pool += it }
+            runCatching { channelDao.searchList(token, playlistIds, FAILOVER_SEARCH_LIMIT) }.getOrNull()?.let { pool += it }
         }
-        return rankFailoverCandidates(interrupted, pool.toList(), ids)
+        return rankFailoverCandidates(interrupted, pool.toList(), playlistIds)
     }
 
     /**
@@ -1482,7 +1498,8 @@ class LiveViewModel(
      */
     private suspend fun awaitFailoverSuccess(target: ChannelEntity, signals: CandidateSignals): Boolean {
         delay(FAILOVER_SETTLE_MS)
-        return kotlinx.coroutines.withTimeoutOrNull(FAILOVER_CANDIDATE_TIMEOUT_MS) {
+        // Ten seconds from its tune, the same window the interrupted channel had before the hop.
+        return kotlinx.coroutines.withTimeoutOrNull(FAILOVER_WATCHDOG_MS - FAILOVER_SETTLE_MS) {
             repeat(Int.MAX_VALUE) {
                 if (!_fullscreenLive.value || _previewChannel.value?.id != target.id) return@withTimeoutOrNull true
                 if (signals.playing()) return@withTimeoutOrNull true
@@ -1500,14 +1517,20 @@ class LiveViewModel(
      * keep navigating from there when they leave fullscreen. The zap list was armed for [target]
      * before the tune, so CH± already steps through the new playlist's category.
      *
+     * With one playlist picked as the active one, the browse screens show only that playlist, so the
+     * active playlist switches to the working one first (the top-bar playlist pill follows).
+     *
      * The folder is selected only once it is actually in the rail (the new playlist's categories
      * land asynchronously); a channel whose folder is missing or hidden falls back to All, the same
      * rule [revealChannel] applies to a Guide pick. A locked rail (kids mode) is left alone.
      */
     private suspend fun settleSuccessfulHop(target: ChannelEntity) {
+        if (settings.defaultSourceId.first() > 0 && target.sourceId !in ctx.value.sourceIds) {
+            settings.setDefaultSource(target.sourceId)
+        }
         val folder = target.categoryId?.let { LiveKey.Folder(it) }
         val inRail = folder != null &&
-            kotlinx.coroutines.withTimeoutOrNull(2_000) {
+            kotlinx.coroutines.withTimeoutOrNull(5_000) {
                 railItems.first { list -> list.any { it.key == folder } }
             } != null
         if (lockedKey == null) _selected.value = if (inRail) folder else LiveKey.All
@@ -2506,9 +2529,6 @@ class LiveViewModel(
         /** How long a hopped stream gets to clear the old error and start loading before judging it. */
         const val FAILOVER_SETTLE_MS = 1_500L
 
-        /** How long each hopped match gets to start playing before the hop moves to the next one. */
-        const val FAILOVER_CANDIDATE_TIMEOUT_MS = 25_000L
-
         /** How long a hopped match's engine error must stand before the hop moves on. Core's ladder
          *  switches engines within ~2 s of a failed rung (mpv's 1.5 s release + the 0.5 s surface
          *  handoff), so an error still there after this is the ladder giving up, not a rung. */
@@ -2517,6 +2537,10 @@ class LiveViewModel(
         /** How long a channel that never started gets to produce either a stream or an error before
          *  the never-started watchdog hops on its behalf (the mobile tuner's ten-second window). */
         const val FAILOVER_WATCHDOG_MS = 10_000L
+
+        /** Rows each name probe may return. Generous, so every playlist's entry for a common word
+         *  ("nova", "sports") reaches the ranker — at 50 the alphabetical cut dropped most playlists. */
+        const val FAILOVER_SEARCH_LIMIT = 2_000
 
     }
 }

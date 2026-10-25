@@ -79,12 +79,26 @@ class ChannelFailoverTest {
     }
 
     @Test
-    fun `same playlist sibling comes before other playlists`() {
+    fun `every other playlist once, its best match, in profile order`() {
         val original = channel(1, 10, "BBC One HD")
-        val sibling = channel(2, 10, "BBC ONE")
-        val nextPlaylist = channel(3, 20, "BBC One HD")
-        val ranked = rankFailoverCandidates(original, listOf(nextPlaylist, sibling), listOf(10, 20))
-        assertEquals(listOf(2L, 3L), ranked.map { it.channel.id })
+        val sibling = channel(2, 10, "BBC ONE") // the interrupted playlist: skipped
+        val lastLoose = channel(3, 30, "BBC One")
+        val lastExact = channel(4, 30, "BBC ONE HD")
+        val firstOnly = channel(5, 20, "BBC One FHD")
+        val ranked = rankFailoverCandidates(
+            original,
+            listOf(lastLoose, sibling, lastExact, firstOnly),
+            listOf(10, 20, 30),
+        )
+        assertEquals(listOf(5L, 4L), ranked.map { it.channel.id })
+    }
+
+    @Test
+    fun `no cap on how many playlists are tried`() {
+        val original = channel(1, 10, "ERT 1")
+        val others = (1..12).map { n -> channel(100L + n, 10L + n, "ERT1 HD") }
+        val ranked = rankFailoverCandidates(original, others.reversed(), (10L..22L).toList())
+        assertEquals(others.map { it.id }, ranked.map { it.channel.id })
     }
 
     @Test

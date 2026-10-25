@@ -18,6 +18,8 @@
 - **🗂️ Bulk import: live channels only, or channels plus VOD**
 
 ### 🐛 Fixes
+- **Switching server tries every other playlist, ten seconds each, also while one playlist is the active one**
+- **Switching server names the playlist being tried for as long as it is tried**
 - **Switching server stops after one full pass when nothing plays, instead of hopping on for ever**
 - **Switching server gives each channel the engine fallback before moving on**
 - **Switching server reads a channel on MPV as playing only once it actually plays**

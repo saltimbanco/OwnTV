@@ -4,8 +4,8 @@ import tv.own.owntv.core.database.entity.ChannelEntity
 import java.text.Normalizer
 
 /**
- * Cross-playlist failover: when a live stream is interrupted, hop to the same channel on the
- * same playlist (another entry for it, if one exists) or on the next playlist.
+ * Cross-playlist failover: when a live stream is interrupted, hop to the same channel on each of
+ * the other playlists in turn.
  *
  * Candidates are found by fuzzy channel-name matching ([matchScore]) and tried in order until one
  * plays (see [LiveViewModel]'s failover watcher). The matcher is ported from the mobile app's
@@ -16,9 +16,6 @@ data class RankedFailoverCandidate(val channel: ChannelEntity, val score: Double
 
 /** Minimum [matchScore] for a candidate to be considered the same channel. */
 const val FAILOVER_MIN_SCORE = 0.45
-
-/** Maximum streams tried per interruption (the interrupted one excluded). */
-const val MAX_FAILOVER_ATTEMPTS = 8
 
 /** Tokens that carry no identity for a search probe ("BBC One HD" and "BBC ONE FHD" match alike). */
 private val FAILOVER_PROBE_STOPWORDS = setOf(
@@ -101,35 +98,28 @@ fun matchScore(targetName: String, candidateName: String): Double {
 }
 
 /**
- * Order [candidates] for hopping after [original] was interrupted.
- *
- * Same-playlist siblings come first (another entry for the channel, if it exists), then other
- * playlists in profile order ([sourceOrder]). Within each band, best fuzzy match first. Entries
- * below [FAILOVER_MIN_SCORE] are dropped, as is the interrupted stream itself (same id or same
- * URL — retrying the identical URL is the engine's own retry, not a hop). Matching is purely
- * name-based: provider ids are not comparable across playlists.
+ * Order [candidates] for hopping after [original] was interrupted: one stream per **other**
+ * playlist — that playlist's best fuzzy match — in profile order ([sourceOrder]), so the hop walks
+ * every other playlist exactly once. The interrupted channel's own playlist is skipped (an outage
+ * there takes its siblings with it), as is any stream with the interrupted one's URL. Entries
+ * below [FAILOVER_MIN_SCORE] are dropped. Matching is purely name-based: provider ids are not
+ * comparable across playlists.
  */
 fun rankFailoverCandidates(
     original: ChannelEntity,
     candidates: List<ChannelEntity>,
     sourceOrder: List<Long>,
-    limit: Int = MAX_FAILOVER_ATTEMPTS,
     minScore: Double = FAILOVER_MIN_SCORE,
 ): List<RankedFailoverCandidate> {
     val orderIndex = sourceOrder.withIndex().associate { (i, id) -> id to i }
     return candidates
         .asSequence()
-        .filter { it.id != original.id && it.streamUrl != original.streamUrl }
+        .filter { it.sourceId != original.sourceId && it.streamUrl != original.streamUrl }
         .distinctBy { it.id }
         .map { ch -> RankedFailoverCandidate(ch, matchScore(original.name, ch.name)) }
         .filter { it.score >= minScore }
-        .sortedWith(
-            compareBy<RankedFailoverCandidate>(
-                { if (it.channel.sourceId == original.sourceId) 0 else 1 },
-                { orderIndex[it.channel.sourceId] ?: Int.MAX_VALUE },
-                { -it.score },
-            ),
-        )
-        .take(limit)
-        .toList()
+        .groupBy { it.channel.sourceId }
+        .values
+        .map { inPlaylist -> inPlaylist.maxBy { it.score } }
+        .sortedBy { orderIndex[it.channel.sourceId] ?: Int.MAX_VALUE }
 }

@@ -1828,6 +1828,7 @@ fun OwnTVShell(
                                 n.attempt,
                                 n.total,
                             ),
+                            durationMs = n.windowMs,
                         )
                     }
                 }
