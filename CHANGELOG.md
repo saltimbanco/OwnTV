@@ -7,15 +7,20 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
-## v5.2.2 — 2026-10-22
+## v5.2.2 — 2026-10-25
 
 ### ✨ New features
 - **🏆 Sports Hub: Super League Greece — its live scores land in the hub, with standings and team pages, and the channels showing its matches turn up in the guide**
-- **⏱️ No picture for five seconds: the same channel hops to the next playlist on its own**
+- **⏱️ No picture for ten seconds: the same channel hops to the next playlist on its own, and the browse section follows it**
 - **⚙️ "Switch server on interruption" becomes a setting — a switch under Live tuning plus a retries count**
 - **🔑 The server list imports each login once: duplicate lines are skipped and reported in the result**
 - **🔤 Switch-server matching reads shortened, decorated and non-Latin channel names (the phone's matcher)**
 - **🗂️ Bulk import: live channels only, or channels plus VOD**
+
+### 🐛 Fixes
+- **Switching server stops after one full pass when nothing plays, instead of hopping on for ever**
+- **Switching server gives each channel the engine fallback before moving on**
+- **Switching server reads a channel on MPV as playing only once it actually plays**
 
 ### 🍴 Fork highlights — what this app keeps beyond the upstream app
 - **🔀 Cross-playlist switch on interruption: a breaking stream hops across your playlists until one plays**
