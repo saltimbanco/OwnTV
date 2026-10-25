@@ -1334,7 +1334,7 @@ class LiveViewModel(
      * ExoPlayer answers with its PLAYING state (it survives a pause), exactly like the phone. core
      * 1.0.67's mpv player has no latched started signal — the phone reads `playbackStarted`, which
      * landed in core 1.0.68 — so mpv answers with `isPlaying` alone. The one corner that buys is a
-     * user pause landing inside the five-second window (a tune five seconds old is not usually being
+     * user pause landing inside the ten-second window (a tune ten seconds old is not usually being
      * paused) reading as an un-started stream and hopping; without the phone's signal there is no
      * way to tell a pause from a never-loaded stream on this core, and the never-loaded stream is
      * the case the watchdog exists for.
@@ -1406,7 +1406,10 @@ class LiveViewModel(
                     )
                     zapList.armFor(target)
                     live.launch { playChannel(target, fromFailover = true) }.join()
-                    if (awaitFailoverSuccess(target)) return@launch
+                    if (awaitFailoverSuccess(target)) {
+                        settleSuccessfulHop(target)
+                        return@launch
+                    }
                 }
                 _failoverExhausted.tryEmit(FailoverExhausted(interrupted.name))
             } finally {
@@ -1447,6 +1450,27 @@ class LiveViewModel(
             }
             false
         } ?: false
+    }
+
+    /**
+     * The hop worked: the browse section moves with it. The working channel lives on another
+     * playlist — its category folder belongs to that playlist — so selecting that folder puts the
+     * user on the playlist that actually plays, inside the category holding the channel, and they
+     * keep navigating from there when they leave fullscreen. The zap list was armed for [target]
+     * before the tune, so CH± already steps through the new playlist's category.
+     *
+     * The folder is selected only once it is actually in the rail (the new playlist's categories
+     * land asynchronously); a channel whose folder is missing or hidden falls back to All, the same
+     * rule [revealChannel] applies to a Guide pick. A locked rail (kids mode) is left alone.
+     */
+    private suspend fun settleSuccessfulHop(target: ChannelEntity) {
+        val folder = target.categoryId?.let { LiveKey.Folder(it) }
+        val inRail = folder != null &&
+            kotlinx.coroutines.withTimeoutOrNull(2_000) {
+                railItems.first { list -> list.any { it.key == folder } }
+            } != null
+        if (lockedKey == null) _selected.value = if (inRail) folder else LiveKey.All
+        zapList.armFor(target)
     }
 
     /** The most-recently-watched live channel for the active profile (for "resume last channel"). Waits
@@ -2445,8 +2469,8 @@ class LiveViewModel(
         const val FAILOVER_CANDIDATE_TIMEOUT_MS = 25_000L
 
         /** How long a channel that never started gets to produce either a stream or an error before
-         *  the never-started watchdog hops on its behalf (the mobile tuner's five-second window). */
-        const val FAILOVER_WATCHDOG_MS = 5_000L
+         *  the never-started watchdog hops on its behalf (the mobile tuner's ten-second window). */
+        const val FAILOVER_WATCHDOG_MS = 10_000L
 
     }
 }
