@@ -757,7 +757,15 @@ fun OwnTVShell(
             RemoteShortcutAction.EXPAND_NOW_PLAYING -> if (playerMode == PlayerMode.MINI || playerMode == PlayerMode.AUDIO) expandPlayer()
             RemoteShortcutAction.ENTER_MINI_PLAYER -> if (playerMode == PlayerMode.FULLSCREEN) dockPlayer()
             RemoteShortcutAction.ENTER_AUDIO_MODE -> if (playerMode == PlayerMode.FULLSCREEN || playerMode == PlayerMode.MINI) toAudioMode()
-            RemoteShortcutAction.PLAY_PAUSE -> if (playerMode != PlayerMode.NONE) dockedEngine.togglePlayPause()
+            // Fullscreen live pauses must reach the view model: the engines expose no paused state, so
+            // the user's own draw of the toggle is the pause evidence the silent-interruption watcher
+            // uses not to hop a parked stream (LiveViewModel.toggleLivePlayPause). Anything else is
+            // not live failover territory — the docked engine toggles itself.
+            RemoteShortcutAction.PLAY_PAUSE -> when {
+                playerMode == PlayerMode.FULLSCREEN && zapSource == MainSection.LIVE_TV -> liveVm.toggleLivePlayPause()
+                playerMode != PlayerMode.NONE -> dockedEngine.togglePlayPause()
+                else -> Unit
+            }
             RemoteShortcutAction.RETURN_TO_LIVE -> if (playerMode != PlayerMode.NONE && zapSource == MainSection.LIVE_TV && timeshifted) liveVm.goToLive()
             RemoteShortcutAction.PREVIOUS_CHANNEL -> if (playerMode != PlayerMode.NONE && zapSource == MainSection.LIVE_TV) liveVm.previousChannel()
             RemoteShortcutAction.PAGE_TOWARD_FIRST,
@@ -995,7 +1003,12 @@ fun OwnTVShell(
                 }
                 if (e.type != KeyEventType.KeyDown || playerMode != PlayerMode.MINI) return@onKeyEvent false
                 when (e.key) {
-                    Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> { dockedEngine.togglePlayPause(); true }
+                    // Same reason as PLAY_PAUSE above: interrupting-the-user guard when the docked
+                    // stream is the live channel (it pauses docked, fullscreen would hop frozen pictures).
+                    Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> {
+                        if (zapSource == MainSection.LIVE_TV) liveVm.toggleLivePlayPause() else dockedEngine.togglePlayPause()
+                        true
+                    }
                     Key.ChannelUp -> dockedZap?.let { it(1); true } ?: false
                     Key.ChannelDown -> dockedZap?.let { it(-1); true } ?: false
                     else -> false
