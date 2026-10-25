@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -1226,11 +1227,12 @@ class LiveViewModel(
     }
 
     // --- Cross-playlist failover: hop to the same channel elsewhere on interruption ---------------
-    // When the fullscreen live stream is interrupted (the engine ladder gave up and surfaced an
-    // error), fuzzy-match the channel name across the profile's playlists and hop through the
-    // matches — same-playlist siblings first, then the next playlists in profile order — until one
-    // plays. Every hop raises [failoverNotice] so the popup names the playlist switch; when nothing
-    // matches or nothing plays, [failoverExhausted] leaves the engine's own error screen up.
+    // When the fullscreen live stream is not playing ten seconds after its tune, or becomes
+    // interrupted once playing — with an engine error the ladder reports, or silently, with the
+    // picture frozen and no error raised — fuzzy-match the channel name across every live playlist
+    // of the profile and hop through them — each other playlist once, its best match, in profile
+    // order, ten seconds each — until one plays. Every hop raises [failoverNotice] so the popup
+    // names the playlist switch; when nothing matches or nothing plays, [failoverExhausted] says so.
 
     /** One hop: which playlist the switch went to, and how far through the matches it is. */
     data class FailoverNotice(
@@ -1239,9 +1241,12 @@ class LiveViewModel(
         val toPlaylist: String?,
         val attempt: Int,
         val total: Int,
+        /** How long this match gets to play — the popup stays up that long, so the screen says which
+         *  playlist is being tried for as long as it is being tried. */
+        val windowMs: Long,
     )
 
-    /** No match, or every match failed — the interrupted channel stays on the error screen. */
+    /** No match, or every match failed: the hop stops on the last playlist it tried. */
     data class FailoverExhausted(val channelName: String)
 
     private val _failoverActive = MutableStateFlow(false)
@@ -1258,10 +1263,13 @@ class LiveViewModel(
     private var failoverJob: Job? = null
 
     /**
-     * The channel whose latest incident gave up on hopping: the watchdog does not re-arm against it
-     * — the same silent channel would restart the walk forever — until the user tunes again.
+     * An incident walked every match and none played: no automatic hop starts again until the user
+     * tunes a channel themselves. The walk ends on its last match, not on the channel it began from,
+     * so remembering only that channel let the watchdog start a fresh walk from the last match ten
+     * seconds later — and from the match after that, for ever, opening and releasing a player (and
+     * an audio track) every few seconds.
      */
-    private var failoverExhaustedChannelId: Long = -1L
+    private var failoverSpent = false
 
     /** The shell sets this: failover only drives the fullscreen live player, never the preview pane. */
     private val _fullscreenLive = MutableStateFlow(false)
@@ -1333,7 +1341,6 @@ class LiveViewModel(
         if (current.id != armed.id) return
         // A channel handed to an external player never plays here — its silence is not a dead stream.
         if (externalPlayerOn.value) return
-        if (_previewChannel.value?.id == failoverExhaustedChannelId) return
         if (liveIsProducingPlayback()) return
         // An engine error standing does not defer the hop to the error watcher: the very first
         // attempt that fails gets its hop now, the way the phone's tuner does it. The error watcher
@@ -1343,24 +1350,20 @@ class LiveViewModel(
 
     /**
      * Whether the live stream on screen is actually **producing** playback — not merely opened. The
-     * same test the mobile tuner applies, as far as this fork's pinned core (1.0.67) allows: a dead
-     * channel that opens fine and then sits loading forever has a URL and no error, so "has a
-     * stream" or "is buffering" can never count as playing.
+     * same test the mobile tuner applies: a dead channel that opens fine and then sits loading
+     * forever has a URL and no error, so "has a stream" or "is buffering" can never count as playing.
      *
-     * ExoPlayer answers with its PLAYING state (it survives a pause), exactly like the phone. core
-     * 1.0.67's mpv player has no latched started signal — the phone reads `playbackStarted`, which
-     * landed in core 1.0.68 — so mpv answers with `isPlaying` alone. The one corner that buys is a
-     * user pause landing inside the five-second window (a tune five seconds old is not usually being
-     * paused) reading as an un-started stream and hopping; without the phone's signal there is no
-     * way to tell a pause from a never-loaded stream on this core, and the never-loaded stream is
-     * the case the watchdog exists for.
+     * ExoPlayer answers with its PLAYING state, exactly like the phone. mpv answers with
+     * `playbackStarted`, the latched signal core's own ladder reads ([tv.own.owntv.player.LiveEngines.awaitMpvOutcome]):
+     * mpv seeds `isPlaying` true the moment a load starts, so `isPlaying` called every mpv tune
+     * playing — a dead channel never hopped, and a hop onto mpv always looked like it had worked.
      */
     private fun liveIsProducingPlayback(): Boolean =
         if (liveOnExo.value) {
             previewEngine.error.value == null &&
                 previewEngine.state.value == tv.own.owntv.player.LivePreviewEngine.State.PLAYING
         } else {
-            player.error.value == null && player.isPlaying.value
+            player.error.value == null && player.playbackStarted.value
         }
 
     private fun cancelFailover() {
@@ -1369,13 +1372,93 @@ class LiveViewModel(
         if (_failoverActive.value) _failoverActive.value = false
     }
 
-    /** Clear what [failoverExhaustedChannelId] marked: the user tuning again runs a fresh incident. */
-    private fun markFailoverExhausted(channelId: Long) {
-        failoverExhaustedChannelId = channelId
-    }
-
     /** Manual tunes win over a hop in flight — the user is already somewhere else. */
     fun cancelFailoverForManualTune() = cancelFailover()
+
+    // --- Silent interruption: a channel that played and then stopped, with no error --------------
+    // The never-started watchdog above covers a channel that never produced a picture, and the
+    // error watcher covers every failure the engines surface. Between them falls the feed that
+    // DRIES UP in place: mpv keeps its loader open without ever raising an error, the reconnect
+    // ladder can hang silent for minutes, and nothing on screen changes — so no flow re-arms
+    // either watcher. [startSilentInterruptionWatcher] re-inspects production directly each
+    // second: a picture that has been frozen for [FAILOVER_WATCHDOG_MS] on a tune that once
+    // produced one is the same interruption the other triggers serve — the hop, in profile
+    // order, with the popup naming each playlist. A one-second glitch re-proves production and
+    // restarts the window, so only a real outage of that length starts the walk.
+
+    /** The channel [startSilentInterruptionWatcher] measures production for. */
+    private var silentStallChannelId = -1L
+
+    /** Whether that channel ever moved its picture — proves the current freeze is an interruption,
+     *  not the never-started channel the watchdog above already owns. */
+    private var silentStallProduced = false
+
+    /** When the picture last moved, once it stops; -1 while it still produces. */
+    private var silentStallUnproducedSinceMs = -1L
+
+    /**
+     * The user's own play/pause on the fullscreen live channel. No engine reports a pause state to
+     * this view model (mpv's isPlaying is re-seeded true at every load, and the Exo engine's state
+     * has no paused rung), yet a parked stream sits with a frozen position exactly like a dead one.
+     * The app's own draw of the toggle ([toggleLivePlayPause]) is therefore the pause evidence: the
+     * silent-interruption window does not tick under it, and any tune clears it.
+     */
+    private var userPausedLive = false
+
+    /** Play/pause the fullscreen live channel — and say so for [startSilentInterruptionWatcher]. */
+    fun toggleLivePlayPause() {
+        userPausedLive = !userPausedLive
+        if (liveOnExo.value) previewEngine.togglePlayPause() else player.togglePlayPause()
+    }
+
+    private fun startSilentInterruptionWatcher() {
+        viewModelScope.launch {
+            // Each engine answers with its own position: ExoPlayer's [LivePreviewEngine.livePositionMs]
+            // and mpv's [OwnTVPlayer.position]. Advancing is production; frozen is a stop — either
+            // because the stream stopped arriving or because the user parked it ([userPausedLive]).
+            var lastExoPositionMs = -1L
+            var lastMpvPositionMs = -1L
+            while (true) {
+                delay(FAILOVER_POLL_MS)
+                if (!_fullscreenLive.value || _failoverActive.value || _catchupActive.value) continue
+                if (externalPlayerOn.value || timeshift.isRewound) continue
+                val channel = _previewChannel.value ?: continue
+                // A different tune is a different stream: production is measured from its open.
+                if (channel.id != silentStallChannelId) {
+                    silentStallChannelId = channel.id
+                    silentStallProduced = false
+                    silentStallUnproducedSinceMs = -1L
+                    lastExoPositionMs = -1L
+                    lastMpvPositionMs = -1L
+                }
+                if (userPausedLive) { silentStallUnproducedSinceMs = -1L; continue }
+                val now = android.os.SystemClock.elapsedRealtime()
+                val producing: Boolean
+                if (liveOnExo.value) {
+                    val position = previewEngine.livePositionMs()
+                    producing = position > 0L && position != lastExoPositionMs
+                    lastExoPositionMs = position
+                } else {
+                    val position = player.position.value
+                    producing = position > 0L && position != lastMpvPositionMs
+                    lastMpvPositionMs = position
+                }
+                if (producing) {
+                    silentStallProduced = true
+                    silentStallUnproducedSinceMs = -1L
+                    continue
+                }
+                // Not produced yet is the never-started watchdog's case; error-bearing stops are the
+                // error watcher's. Only a silent freeze on a channel that once played hops here.
+                if (!silentStallProduced || !liveIsProducingPlayback()) continue
+                if (silentStallUnproducedSinceMs < 0L) { silentStallUnproducedSinceMs = now; continue }
+                if (now - silentStallUnproducedSinceMs < FAILOVER_WATCHDOG_MS) continue
+                silentStallUnproducedSinceMs = -1L
+                Log.i(TAG, "failover: silent interruption '${channel.name}', walking playlists")
+                startFailover(channel)
+            }
+        }
+    }
 
     /**
      * How many times the stream on screen has failed: the count the "Retries before switching
@@ -1396,73 +1479,171 @@ class LiveViewModel(
     private var failoverErrorStreak = 0
 
     private fun startFailover(interrupted: ChannelEntity) {
-        if (!FailoverPrefs.isEnabled(appContext)) return
+        if (!FailoverPrefs.isEnabled(appContext) || failoverSpent) return
         cancelFailover()
         _failoverActive.value = true
         failoverJob = viewModelScope.launch {
             try {
-                val candidates = withContext(Dispatchers.IO) { findFailoverCandidates(interrupted) }
+                // Every live playlist of the profile, not just the one the browse screens show: with an
+                // active playlist picked ("Server 2"), the hop searched that playlist alone, found nothing
+                // to hop to, and left the channel to core's 30-second give-up.
+                val playlists = withContext(Dispatchers.IO) {
+                    currentProfileId()?.let { pid -> sourceDao.observeForProfile(pid).first().filter { it.syncLive } }
+                }.orEmpty()
+                val playlistNames = playlists.associate { it.id to it.name }
+                val candidates = withContext(Dispatchers.IO) {
+                    findFailoverCandidates(interrupted, playlists.map { it.id })
+                }
                 if (candidates.isEmpty()) {
+                    failoverSpent = true
                     _failoverExhausted.tryEmit(FailoverExhausted(interrupted.name))
                     return@launch
                 }
-                val fromName = sourceNameOf(interrupted.sourceId)
+                val fromName = playlistNames[interrupted.sourceId]
                 for ((index, ranked) in candidates.withIndex()) {
-                    if (!_fullscreenLive.value) return@launch
+                    if (!_fullscreenLive.value || _catchupActive.value) return@launch
                     val target = custom.value.itemNames[CustomizeKeys.channel(ranked.channel)]
                         ?.let { ranked.channel.copy(name = it) } ?: ranked.channel
                     _failoverNotice.tryEmit(
                         FailoverNotice(
                             channelName = interrupted.name,
                             fromPlaylist = fromName,
-                            toPlaylist = sourceNameOf(target.sourceId),
+                            toPlaylist = playlistNames[target.sourceId],
                             attempt = index + 1,
                             total = candidates.size,
+                            windowMs = FAILOVER_WATCHDOG_MS,
                         ),
                     )
                     zapList.armFor(target)
-                    live.launch { playChannel(target, fromFailover = true) }.join()
-                    if (awaitFailoverSuccess(target)) return@launch
+                    val played = kotlinx.coroutines.coroutineScope {
+                        // Listening before the tune, so nothing the match reports is missed.
+                        val signals = CandidateSignals(this)
+                        live.launch { playChannel(target, fromFailover = true) }.join()
+                        awaitFailoverSuccess(target, signals).also { coroutineContext.cancelChildren() }
+                    }
+                    if (played) {
+                        settleSuccessfulHop(target)
+                        return@launch
+                    }
                 }
+                // Set here rather than in `finally`: a walk the user overtook (a tune, leaving full
+                // screen) is cancelled, and must not block the incidents of what they tuned instead.
+                failoverSpent = true
                 _failoverExhausted.tryEmit(FailoverExhausted(interrupted.name))
             } finally {
-                // Every way this incident ended — exhausted, satisfied by a hop, or overtaken — stops
-                // the watchdog from arming against the interrupted channel again on its own.
-                markFailoverExhausted(interrupted.id)
                 _failoverActive.value = false
             }
         }
     }
 
-    /** Fuzzy name matches across the profile's playlists, ranked to hop. Name-only: provider
+    /** Fuzzy name matches across [playlistIds] (profile order), ranked to hop. Name-only: provider
      *  remote ids and EPG ids are not comparable across playlists, so they take no part. */
-    private suspend fun findFailoverCandidates(interrupted: ChannelEntity): List<RankedFailoverCandidate> {
-        val ids = ctx.value.sourceIds.ifEmpty { return emptyList() }
+    private suspend fun findFailoverCandidates(
+        interrupted: ChannelEntity,
+        playlistIds: List<Long>,
+    ): List<RankedFailoverCandidate> {
+        if (playlistIds.isEmpty()) return emptyList()
         val pool = mutableSetOf<ChannelEntity>()
         failoverTokens(normalizeChannelName(interrupted.name)).take(4).forEach { token ->
-            runCatching { channelDao.searchList(token, ids, 50) }.getOrNull()?.let { pool += it }
+            runCatching { channelDao.searchList(token, playlistIds, FAILOVER_SEARCH_LIMIT) }.getOrNull()?.let { pool += it }
         }
-        return rankFailoverCandidates(interrupted, pool.toList(), ids)
+        return rankFailoverCandidates(interrupted, pool.toList(), playlistIds)
     }
 
     /**
-     * Whether [target] took over the screen: playing with no engine error. A fresh error for it
-     * means hop on; leaving fullscreen or tuning elsewhere means stop hopping (success — something
-     * else owns the screen now).
+     * What the engines report about one hopped match, counting only what they say after its tune
+     * began. Neither engine clears its error when it stops (nor mpv its started flag), and core makes
+     * the other engine the active one before that engine's next load resets them — so reading the
+     * engines directly took the previous match's error for this one's and skipped a match nobody had
+     * tried. Each error keeps the moment it was raised, so a rung of core's ladder (ExoPlayer erroring
+     * on its way to mpv) is not taken for the ladder giving up.
      */
-    private suspend fun awaitFailoverSuccess(target: ChannelEntity): Boolean {
+    private inner class CandidateSignals(scope: kotlinx.coroutines.CoroutineScope) {
+        private var exoError: tv.own.owntv.player.PlaybackFailure? = null
+        private var exoErrorAtMs = 0L
+        private var mpvError: tv.own.owntv.player.PlaybackFailure? = null
+        private var mpvErrorAtMs = 0L
+        private var exoPlaying = false
+        private var mpvStarted = false
+
+        init {
+            // drop(1): each flow's value from before this match is the previous match's.
+            val undispatched = kotlinx.coroutines.CoroutineStart.UNDISPATCHED
+            scope.launch(start = undispatched) {
+                previewEngine.error.drop(1).collect { exoError = it; exoErrorAtMs = android.os.SystemClock.elapsedRealtime() }
+            }
+            scope.launch(start = undispatched) {
+                player.error.drop(1).collect { mpvError = it; mpvErrorAtMs = android.os.SystemClock.elapsedRealtime() }
+            }
+            scope.launch(start = undispatched) {
+                previewEngine.state.drop(1).collect { exoPlaying = it == tv.own.owntv.player.LivePreviewEngine.State.PLAYING }
+            }
+            scope.launch(start = undispatched) { player.playbackStarted.drop(1).collect { mpvStarted = it } }
+        }
+
+        /** The engine on screen produced playback for this match, with no error since. */
+        fun playing(): Boolean =
+            if (liveOnExo.value) exoPlaying && exoError == null else mpvStarted && mpvError == null
+
+        /** The engine on screen raised an error for this match and has held it for [ms] — core's
+         *  ladder moves on from a failed rung within about two seconds, so this is the ladder's verdict. */
+        fun errorStoodFor(ms: Long): Boolean {
+            val (error, atMs) = if (liveOnExo.value) exoError to exoErrorAtMs else mpvError to mpvErrorAtMs
+            return error != null && android.os.SystemClock.elapsedRealtime() - atMs >= ms
+        }
+    }
+
+    /**
+     * Whether [target] took over the screen: playing with no engine error. An error that core's
+     * ladder stopped working on means hop on; leaving fullscreen or tuning elsewhere means stop
+     * hopping (success — something else owns the screen now).
+     */
+    private suspend fun awaitFailoverSuccess(target: ChannelEntity, signals: CandidateSignals): Boolean {
         delay(FAILOVER_SETTLE_MS)
-        if (!_fullscreenLive.value || _previewChannel.value?.id != target.id) return true
-        return kotlinx.coroutines.withTimeoutOrNull(FAILOVER_CANDIDATE_TIMEOUT_MS) {
+        // Ten seconds from its tune, the same window the interrupted channel had before the hop.
+        return kotlinx.coroutines.withTimeoutOrNull(FAILOVER_WATCHDOG_MS - FAILOVER_SETTLE_MS) {
             repeat(Int.MAX_VALUE) {
                 if (!_fullscreenLive.value || _previewChannel.value?.id != target.id) return@withTimeoutOrNull true
-                if (activeEngineError() != null) return@withTimeoutOrNull false
-                val playing = if (liveOnExo.value) previewEngine.isPlaying.value else player.isPlaying.value
-                if (playing) return@withTimeoutOrNull true
-                delay(500)
+                // A catch-up pick replaces the preview channel without touching the hop: without this
+                // guard the "screen moved on" branch above reads it as the target having won, and the
+                // walk's success settles a playlist switch on top of an archive the user just opened.
+                // Catch-up ownership is its own incident — the walk ends quietly, no settle, no
+                // exhausted notice. [playCatchupProgramme] already cancels the job; this closes the
+                // same race from the other end, for the window between the two.
+                if (_catchupActive.value) return@withTimeoutOrNull false
+                if (signals.playing()) return@withTimeoutOrNull true
+                if (signals.errorStoodFor(FAILOVER_ERROR_STANDING_MS)) return@withTimeoutOrNull false
+                delay(250)
             }
             false
         } ?: false
+    }
+
+    /**
+     * The hop worked: the browse section moves with it. The working channel lives on another
+     * playlist — its category folder belongs to that playlist — so selecting that folder puts the
+     * user on the playlist that actually plays, inside the category holding the channel, and they
+     * keep navigating from there when they leave fullscreen. The zap list was armed for [target]
+     * before the tune, so CH± already steps through the new playlist's category.
+     *
+     * With one playlist picked as the active one, the browse screens show only that playlist, so the
+     * active playlist switches to the working one first (the top-bar playlist pill follows).
+     *
+     * The folder is selected only once it is actually in the rail (the new playlist's categories
+     * land asynchronously); a channel whose folder is missing or hidden falls back to All, the same
+     * rule [revealChannel] applies to a Guide pick. A locked rail (kids mode) is left alone.
+     */
+    private suspend fun settleSuccessfulHop(target: ChannelEntity) {
+        if (settings.defaultSourceId.first() > 0 && target.sourceId !in ctx.value.sourceIds) {
+            settings.setDefaultSource(target.sourceId)
+        }
+        val folder = target.categoryId?.let { LiveKey.Folder(it) }
+        val inRail = folder != null &&
+            kotlinx.coroutines.withTimeoutOrNull(5_000) {
+                railItems.first { list -> list.any { it.key == folder } }
+            } != null
+        if (lockedKey == null) _selected.value = if (inRail) folder else LiveKey.All
+        zapList.armFor(target)
     }
 
     /** The most-recently-watched live channel for the active profile (for "resume last channel"). Waits
@@ -1799,8 +1980,11 @@ class LiveViewModel(
     private suspend fun playChannel(channel: ChannelEntity, fromFailover: Boolean = false) {
         if (!fromFailover) {
             cancelFailover() // a deliberate tune supersedes a hop in flight
-            // A deliberate tune clears the exhausted marker: the watchdog collects its own incident again.
-            failoverExhaustedChannelId = -1L
+            // A deliberate tune ends an exhausted incident: automatic hops may start again.
+            failoverSpent = false
+            // A deliberate tune resumes playback: the interruption watcher must not keep treating a
+            // manually-paused stream as "the user parked it" across the channel it changed to.
+            userPausedLive = false
             // The attempt streak follows the channel: tuning a different channel starts a fresh
             // count (a deliberate tune of the same one carries it, so the user re-picking a dead
             // channel walks the retries to the hop — that is what the mobile incidents count).
@@ -1809,6 +1993,8 @@ class LiveViewModel(
                 failoverErrorStreak = 0
             }
         }
+        // A hop's own tune resumes playback too: any pause the walk inherited ends with it.
+        userPausedLive = false
         val pid = currentProfileId() ?: return
         if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, channel.categoryId, profileDao, categoryDao) || customize.sealsCategory(pid, channel.categoryId)) return
         // Live TV set to play externally: hand the channel over instead of tuning an in-app engine.
@@ -1927,7 +2113,10 @@ class LiveViewModel(
     // collector launched from an init block above starts inline during construction and would combine
     // a still-null _catchupActive (NPE in combine, crashing the shell the moment it composes — every
     // fresh v5.2.2 start). Same trap the failover watcher start at _fullscreenLive works around.
+    // The silent-interruption watcher belongs here too: nothing in its first loop pass runs before
+    // its first second-long delay completes, but it touches the same state this init block follows.
     init { startFailoverWatchdog() }
+    init { startSilentInterruptionWatcher() }
 
     /**
      * No archive URL could be built for what the user just picked.
@@ -1986,6 +2175,10 @@ class LiveViewModel(
             clearTimeshift()                 // a fixed programme replaces any live rewind in progress
             _catchupActive.value = true      // HUD: VOD engine toggle, not the live compatibility toggle
             playingCatchupProgramme = programme // …and the anchor auto-play continues from
+            // The user just took the screen from whatever is in flight: a hop must not keep
+            // trying matches underneath (nor settle its "success" over this archive), and the
+            // interruption watcher must not hop the channel this archive replaced.
+            cancelFailover()
             releaseForArchive() // catch-up is a VOD-style archive on mpv, not the live ExoPlayer channel
             // isLive=false → seekable archive; isArchive → mid-GOP tolerant (hardware first, software rescue).
             // Keyed on the channel's archive, not the time-specific URL; a Stalker archive gets a
@@ -2444,12 +2637,22 @@ class LiveViewModel(
         /** How long a hopped stream gets to clear the old error and start loading before judging it. */
         const val FAILOVER_SETTLE_MS = 1_500L
 
-        /** How long each hopped match gets to start playing before the hop moves to the next one. */
-        const val FAILOVER_CANDIDATE_TIMEOUT_MS = 25_000L
+        /** How long a hopped match's engine error must stand before the hop moves on. Core's ladder
+         *  switches engines within ~2 s of a failed rung (mpv's 1.5 s release + the 0.5 s surface
+         *  handoff), so an error still there after this is the ladder giving up, not a rung. */
+        const val FAILOVER_ERROR_STANDING_MS = 3_000L
 
         /** How long a channel that never started gets to produce either a stream or an error before
-         *  the never-started watchdog hops on its behalf (the mobile tuner's five-second window). */
-        const val FAILOVER_WATCHDOG_MS = 5_000L
+         *  the never-started watchdog hops on its behalf (the mobile tuner's ten-second window). */
+        const val FAILOVER_WATCHDOG_MS = 10_000L
+
+        /** How often [startSilentInterruptionWatcher] re-checks whether the fullscreen live stream
+         *  still moves its picture — the silent interruption window ticks in these steps. */
+        const val FAILOVER_POLL_MS = 1_000L
+
+        /** Rows each name probe may return. Generous, so every playlist's entry for a common word
+         *  ("nova", "sports") reaches the ranker — at 50 the alphabetical cut dropped most playlists. */
+        const val FAILOVER_SEARCH_LIMIT = 2_000
 
     }
 }
