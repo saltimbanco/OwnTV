@@ -7,7 +7,7 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
-## v5.2.2 — 2026-10-25
+## v5.2.2 — 2026-11-01
 
 ### ✨ New features
 - **⏱️ No picture for ten seconds: the same channel hops to the next playlist on its own, and the browse section follows it**
@@ -17,19 +17,19 @@
 - **🗂️ Bulk import: live channels only, or channels plus VOD**
 
 ### 🐛 Fixes
+- **Switching server hops on a stream that freezes in place with no engine error — the same ten-second window as every other interruption, on whichever engine carries the channel**
+- **A pause you made is no longer interrupting: play/pause on live reaches the switch-server watcher, so a parked channel never gets hopped**
+- **Opening a catch-up programme while the switch-server walk is in flight ends the walk quietly — it can no longer settle a playlist switch on top of the archive you just opened**
+- **📺 The app no longer crashes on startup when no playlist is set up**
 - **Switching server tries every other playlist, ten seconds each, also while one playlist is the active one**
 - **Switching server names the playlist being tried for as long as it is tried**
 - **Switching server stops after one full pass when nothing plays, instead of hopping on for ever**
 - **Switching server gives each channel the engine fallback before moving on**
 - **Switching server reads a channel on MPV as playing only once it actually plays**
 
-### 🍴 Fork highlights — what this app keeps beyond the upstream app
-- **🔀 Cross-playlist switch on interruption: a breaking stream hops across your playlists until one plays**
-- **🗂️ Bulk server import from a plain-text file, live-only or channels-plus-VOD**
-- **⏯️ Next/previous channel buttons in the player controls**
-- **⚡ TV-tuned interface performance: Home and the guide re-render less per tick**
-- **📦 One arm APK (arm64-v8a + armeabi-v7a); no x86_64 build**
-## Unreleased
+## Upstream Unreleased
+
+**Merged into this fork on 2026-11-01.**
 
 ### ✨ New features
 - **⚡ Search: the poster backdrop is blurred once, and blurred on Android 11 and older too** (community PR #268 by @sarmadsoomro)
@@ -73,6 +73,13 @@
 - **A new playlist with a name already in use is numbered: "My IPTV 2"**
 - **Renamed channels, films and series keep their name on Home and in Continue**
 - **Stalker portals behind a redirect stay signed in; their posters load**
+
+### 🍴 Fork highlights — what this app keeps beyond the upstream app
+- **🔀 Cross-playlist switch on interruption: a breaking stream hops across your playlists until one plays**
+- **🗂️ Bulk server import from a plain-text file, live-only or channels-plus-VOD**
+- **⏯️ Next/previous channel buttons in the player controls**
+- **⚡ TV-tuned interface performance: Home and the guide re-render less per tick**
+- **📦 One arm APK (arm64-v8a + armeabi-v7a); no x86_64 build**
 
 ## v5.2.1 — 2026-10-21
 
