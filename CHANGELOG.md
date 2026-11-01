@@ -7,10 +7,9 @@
 > Issue numbers that are part of a title are fine; explanatory parentheticals are not. The detail —
 > what, why, files and verification — belongs in the commit message, never here.
 
-## v5.2.2 — 2026-10-25
+## v5.2.2 — 2026-11-01
 
 ### ✨ New features
-- **🏆 Sports Hub: Super League Greece — its live scores land in the hub, with standings and team pages, and the channels showing its matches turn up in the guide**
 - **⏱️ No picture for ten seconds: the same channel hops to the next playlist on its own, and the browse section follows it**
 - **⚙️ "Switch server on interruption" becomes a setting — a switch under Live tuning plus a retries count**
 - **🔑 The server list imports each login once: duplicate lines are skipped and reported in the result**
@@ -18,6 +17,10 @@
 - **🗂️ Bulk import: live channels only, or channels plus VOD**
 
 ### 🐛 Fixes
+- **Switching server hops on a stream that freezes in place with no engine error — the same ten-second window as every other interruption, on whichever engine carries the channel**
+- **A pause you made is no longer interrupting: play/pause on live reaches the switch-server watcher, so a parked channel never gets hopped**
+- **Opening a catch-up programme while the switch-server walk is in flight ends the walk quietly — it can no longer settle a playlist switch on top of the archive you just opened**
+- **📺 The app no longer crashes on startup when no playlist is set up**
 - **Switching server tries every other playlist, ten seconds each, also while one playlist is the active one**
 - **Switching server names the playlist being tried for as long as it is tried**
 - **Switching server stops after one full pass when nothing plays, instead of hopping on for ever**
@@ -203,11 +206,6 @@
 - **⏭️ Auto-play continues past a missing season number instead of stopping**
 - **🔤 M3U episodes named "Season 1 Episode 5" or "S2019E05" are recognised**
 - **💾 Big downloads to a FAT32 USB stick fail with a clear reason**
-
-## v5.4.1 — 2026-10-12
-
-### 🐛 Fixes
-- **📺 The app no longer crashes on startup when no playlist is set up**
 
 ## v5.1.0 — 2026-10-04
 
