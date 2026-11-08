@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import tv.own.owntv.R
 import tv.own.owntv.core.brand.AppIcon
@@ -69,7 +70,10 @@ import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.stageAccent
 import tv.own.owntv.ui.theme.stageText
 
-private enum class Step { WELCOME, DISPLAY_SIZE, DISCLAIMER, SETUP_CHOICE, SYNC_DEVICE, CREATE_PROFILE, ADD_CONTENT, ADD_SOURCE_REMOTE, ADD_SOURCE, IMPORTING, EXISTING, IMPORT_BACKUP_CHOOSER, IMPORT_BACKUP_REMOTE, IMPORT_BACKUP }
+private enum class Step { WELCOME, DISPLAY_SIZE, DISCLAIMER, SETUP_CHOICE, SYNC_DEVICE, CREATE_PROFILE, ADD_CONTENT, ADD_SOURCE_REMOTE, ADD_SOURCE, ADD_SOURCE_LIST, IMPORTING, EXISTING, IMPORT_BACKUP_CHOOSER, IMPORT_BACKUP_REMOTE, IMPORT_BACKUP }
+
+/** Files a server list plausibly arrives as: plain text, sometimes exported with a spreadsheet extension. */
+private val SERVER_LIST_FILE_EXTENSIONS = setOf("txt", "csv", "list", "conf")
 
 /**
  * Onboarding for one profile. [firstRun] shows language/welcome/disclaimer; otherwise it
@@ -93,6 +97,11 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
     var importOrigin by remember { mutableStateOf(Step.ADD_SOURCE) }
     // The playlist being imported, for "Importing <name>"; null when linking existing playlists.
     var importName by remember { mutableStateOf<String?>(null) }
+    // A server-list file has been picked: the browser is gone and the import's own state is showing.
+    var serverListFileChosen by remember { mutableStateOf(false) }
+    val serverListState by vm.serverList.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val ioScope = androidx.compose.runtime.rememberCoroutineScope()
     // Where Back from the backup-restore picker returns to (first-run choice vs. add-content step).
     var backupOrigin by remember { mutableStateOf(Step.ADD_CONTENT) }
     // The chosen backup file and what the user wants out of it. A file with no choice yet is what
@@ -157,9 +166,34 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                 hasExisting = existing.isNotEmpty(),
                 onPhone = { step = Step.ADD_SOURCE_REMOTE },
                 onType = { step = Step.ADD_SOURCE },
+                onFile = { serverListFileChosen = false; vm.resetServerList(); step = Step.ADD_SOURCE_LIST },
                 onExisting = { step = Step.EXISTING },
                 onImport = { backupOrigin = Step.ADD_CONTENT; step = Step.IMPORT_BACKUP_CHOOSER },
                 onSkip = { vm.finish(onDone) },
+            )
+            Step.ADD_SOURCE_LIST -> ServerListImportStep(
+                state = serverListState,
+                fileChosen = serverListFileChosen,
+                onPick = { file ->
+                    serverListFileChosen = true
+                    ioScope.launch {
+                        // The document's text is read here: the view model holds no Context, and the
+                        // parser itself is Settings' — this step only supplies the lines.
+                        val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            runCatching { file.readText() }.getOrNull()
+                        }
+                        vm.startServerList(
+                            text,
+                            defaultServerName = { i -> context.getString(R.string.settings_bulk_import_default_server, i) },
+                            defaultPortalName = { i -> context.getString(R.string.settings_bulk_import_default_portal, i) },
+                            fileLabel = file.name,
+                        )
+                    }
+                },
+                onRetry = { vm.resetServerList(); serverListFileChosen = false },
+                onCancel = { vm.cancelServerList(); serverListFileChosen = false; step = Step.ADD_CONTENT },
+                onContinue = { vm.finish(onDone) },
+                onAddGuide = { PendingShellRequest.addEpg = true; vm.finish(onDone) },
             )
             Step.ADD_SOURCE_REMOTE -> RemoteSetupScreen(
                 state = vm.remoteState.collectAsStateWithLifecycle().value,
@@ -533,9 +567,18 @@ private fun AvatarStrip(ids: List<Int>, chosen: Int) {
     }
 }
 
-/** Add a playlist: From your phone, Type it here, Import (and Existing when another profile has some). */
+/** Add a playlist: From your phone, Type it here, Import a server list, Import (and Existing when another profile has some). */
 @Composable
-private fun AddContentStep(hasExisting: Boolean, onPhone: () -> Unit, onType: () -> Unit, onExisting: () -> Unit, onImport: () -> Unit, onSkip: () -> Unit) {
+private fun AddContentStep(
+    hasExisting: Boolean,
+    onPhone: () -> Unit,
+    onType: () -> Unit,
+    /** A plain-text file of servers — Xtream logins and Stalker portals, mixed freely. */
+    onFile: () -> Unit,
+    onExisting: () -> Unit,
+    onImport: () -> Unit,
+    onSkip: () -> Unit,
+) {
     val first = rememberFirstFocus()
     WizardFrame(
         step = WizardStep.PLAYLIST,
@@ -550,11 +593,106 @@ private fun AddContentStep(hasExisting: Boolean, onPhone: () -> Unit, onType: ()
             listOfNotNull(
                 WizardCard(OwnTVIcon.PHONE, stringResource(R.string.setup_from_phone), stringResource(R.string.setup_phone_card_line), onPhone),
                 WizardCard(OwnTVIcon.PENCIL, stringResource(R.string.settings_add_type_here), stringResource(R.string.settings_line_add_type_here), onType),
+                WizardCard(OwnTVIcon.LIST, stringResource(R.string.setup_import_server_list), stringResource(R.string.setup_import_server_list_line), onFile),
                 if (hasExisting) WizardCard(OwnTVIcon.PLAYLIST, stringResource(R.string.setup_existing), stringResource(R.string.setup_use_other_profile_playlists), onExisting) else null,
                 WizardCard(OwnTVIcon.DOWNLOADS, stringResource(R.string.setup_import), stringResource(R.string.setup_restore_backup_file), onImport),
             ),
             first,
         )
+    }
+}
+
+/**
+ * Importing a mixed server list: the file browser, then progress server by server, then what arrived
+ * — with per-server reasons for the ones that did not, and the duplicate lines the list repeated.
+ * Shares Settings' parser and its wording, so the two places read the same.
+ */
+@Composable
+private fun ServerListImportStep(
+    state: SetupViewModel.ServerListUi,
+    fileChosen: Boolean,
+    onPick: (java.io.File) -> Unit,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+    onContinue: () -> Unit,
+    onAddGuide: () -> Unit,
+) {
+    when (state) {
+        is SetupViewModel.ServerListUi.Idle -> if (!fileChosen) StorageBrowser(
+            title = stringResource(R.string.setup_server_list_pick_file),
+            mode = BrowseMode.FILE,
+            fileExtensions = SERVER_LIST_FILE_EXTENSIONS,
+            onPick = onPick,
+            onDismiss = onCancel,
+        )
+        is SetupViewModel.ServerListUi.Running -> WizardFrame(
+            step = WizardStep.PLAYLIST,
+            title = stringResource(R.string.settings_bulk_import_title, state.done + 1, state.total),
+            sub = stringResource(R.string.setup_watching_during_import),
+            back = WizardAction(stringResource(R.string.common_cancel), onCancel),
+            // Enter the app now; the run keeps going (the ViewModel is activity-scoped).
+            next = WizardAction(stringResource(R.string.setup_run_in_background), onContinue, rememberFirstFocus()),
+        ) {
+            StageSettingRow(
+                icon = OwnTVIcon.DOWNLOADS,
+                title = state.currentName,
+                desc = null,
+                value = null,
+                onClick = {},
+            )
+        }
+        is SetupViewModel.ServerListUi.Done -> {
+            // Built in a loop, not a lambda: each reason is a resource lookup, and those belong to
+            // the composition this function is in.
+            val failureLines = ArrayList<String>(state.failed.size)
+            for (failure in state.failed) {
+                val reason = failure.failure?.displayText() ?: failure.detail.orEmpty()
+                failureLines.add(
+                    if (reason.isBlank()) failure.name
+                    else stringResource(R.string.settings_bulk_import_failure_line, failure.name, reason),
+                )
+            }
+            WizardFrame(
+                step = WizardStep.READY,
+                title = stringResource(R.string.setup_all_set),
+                sub = listOfNotNull(
+                    pluralStringResource(R.plurals.settings_bulk_import_added, state.succeeded.size, state.succeeded.size),
+                    state.failed.takeIf { it.isNotEmpty() }
+                        ?.let { pluralStringResource(R.plurals.settings_bulk_import_failed, it.size, it.size) },
+                    state.skipped.takeIf { it.isNotEmpty() }
+                        ?.let { pluralStringResource(R.plurals.settings_bulk_import_skipped, it.size, it.size) },
+                    failureLines.takeIf { it.isNotEmpty() }?.joinToString("\n"),
+                ).joinToString("\n"),
+                back = null,
+                next = WizardAction(stringResource(R.string.setup_continue), onContinue, rememberFirstFocus()),
+                onBack = onContinue,
+            ) {
+                StageSettingRow(
+                    icon = OwnTVIcon.EPG,
+                    title = stringResource(R.string.setup_add_guide),
+                    desc = stringResource(R.string.setup_add_guide_line),
+                    value = SettingValue.Opens(null),
+                    onClick = onAddGuide,
+                )
+            }
+        }
+        is SetupViewModel.ServerListUi.ParseError -> {
+            val message = when (state.reason) {
+                SetupViewModel.ServerListParseReason.UnreadableFile ->
+                    stringResource(R.string.settings_bulk_import_unreadable_file, state.label)
+                SetupViewModel.ServerListParseReason.Empty -> stringResource(R.string.settings_bulk_import_empty)
+                SetupViewModel.ServerListParseReason.UnreadableLines ->
+                    pluralStringResource(R.plurals.settings_bulk_import_unreadable, state.lines, state.lines)
+            }
+            WizardFrame(
+                step = WizardStep.PLAYLIST,
+                title = stringResource(R.string.settings_bulk_import_parse_error),
+                sub = message + "\n\n" + stringResource(R.string.setup_server_list_format_hint),
+                back = WizardAction(stringResource(R.string.common_back), onCancel),
+                next = WizardAction(stringResource(R.string.setup_try_again_caps), onRetry, rememberFirstFocus()),
+                onBack = onCancel,
+            )
+        }
     }
 }
 

@@ -15,6 +15,7 @@
 - **🔑 The server list imports each login once: duplicate lines are skipped and reported in the result**
 - **🔤 Switch-server matching reads shortened, decorated and non-Latin channel names (the phone's matcher)**
 - **🗂️ Bulk import: live channels only, or channels plus VOD**
+- **📄 First run asks for a server list too: Xtream logins and MAC portals in one text file, mixed**
 
 ### 🐛 Fixes
 - **Switching server hops on a stream that freezes in place with no engine error — the same ten-second window as every other interruption, on whichever engine carries the channel**

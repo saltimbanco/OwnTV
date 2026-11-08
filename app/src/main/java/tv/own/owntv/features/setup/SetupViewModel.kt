@@ -144,6 +144,113 @@ class SetupViewModel(
     fun startM3u(name: String, url: String, userAgent: String = "", epgUrl: String = "", autoRefresh: PlaylistRefresh = PlaylistRefresh.OFF, httpReferer: String = "") =
         runImport { importer.m3u(name, url, userAgent, epgUrl, autoRefresh, httpReferer = httpReferer) }
 
+    // ---- Bulk import of a mixed server list (Xtream logins and Stalker portals in one file) ----
+    //
+    // The parser is Settings' own ([tv.own.owntv.features.settings.parseServerList]): a line's type
+    // comes from its shape, the same login or MAC imports once however many hosts publish it, and
+    // lines that name no server are reported instead of silently dropped. The first run is the same
+    // list in a new place — here there is nothing to replace and the profile this wizard created is
+    // the one core's [SourceImporter] attaches each server to.
+
+    sealed interface ServerListUi {
+        data object Idle : ServerListUi
+        data class Running(val done: Int, val total: Int, val currentName: String) : ServerListUi
+        data class Done(
+            val succeeded: List<String>,
+            val failed: List<FailedServer>,
+            /** Lines that produced no server: unreadable, or duplicates of an earlier line. */
+            val skipped: List<tv.own.owntv.features.settings.SkippedLine>,
+        ) : ServerListUi
+        data class ParseError(val reason: ServerListParseReason, val lines: Int = 0, val label: String = "") : ServerListUi
+    }
+
+    enum class ServerListParseReason { UnreadableFile, Empty, UnreadableLines }
+
+    data class FailedServer(
+        val name: String,
+        /** Core's failure when the import ran and reported one; null when it threw before that. */
+        val failure: SourceImporter.SetupFailure?,
+        val detail: String?,
+    )
+
+    private val _serverList = MutableStateFlow<ServerListUi>(ServerListUi.Idle)
+    val serverList: StateFlow<ServerListUi> = _serverList.asStateFlow()
+    private var serverListJob: Job? = null
+
+    /**
+     * Import every server listed in [text] (null when the picked document could not be read).
+     *
+     * Scopes mirror the single-add defaults: Xtream everything now, Stalker live now with its VOD
+     * deferred (a MAC portal has no bulk VOD endpoint). One server failing does not stop the ones
+     * after it — the result says which arrived and why the rest did not.
+     */
+    fun startServerList(
+        text: String?,
+        defaultServerName: (Int) -> String,
+        defaultPortalName: (Int) -> String,
+        /** Display label of the picked document, for the unreadable-file message. */
+        fileLabel: String = "",
+    ) {
+        serverListJob?.cancel()
+        serverListJob = viewModelScope.launch {
+            if (text == null) {
+                _serverList.value = ServerListUi.ParseError(ServerListParseReason.UnreadableFile, label = fileLabel)
+                return@launch
+            }
+            val parsed = tv.own.owntv.features.settings.parseServerList(text, defaultServerName, defaultPortalName)
+            if (parsed.entries.isEmpty()) {
+                _serverList.value = ServerListUi.ParseError(
+                    if (parsed.skipped.isEmpty()) ServerListParseReason.Empty else ServerListParseReason.UnreadableLines,
+                    parsed.skipped.size,
+                )
+                return@launch
+            }
+            importer.reset()
+            val succeeded = mutableListOf<String>()
+            val failed = mutableListOf<FailedServer>()
+            parsed.entries.forEachIndexed { index, entry ->
+                _serverList.value = ServerListUi.Running(index, parsed.entries.size, entry.name)
+                val thrown = runCatching {
+                    when (entry) {
+                        is tv.own.owntv.features.settings.ServerListEntry.Xtream -> importer.xtream(
+                            name = entry.name, server = entry.server, username = entry.username,
+                            password = entry.password, live = SyncScopeChoice.Now,
+                            movies = SyncScopeChoice.Now, series = SyncScopeChoice.Now,
+                        )
+                        is tv.own.owntv.features.settings.ServerListEntry.Stalker -> importer.stalker(
+                            name = entry.name, portalUrl = entry.portalUrl, mac = entry.mac,
+                            serialNumber = entry.serialNumber, deviceId = entry.deviceId,
+                            deviceId2 = entry.deviceId2, signature = entry.signature,
+                            live = SyncScopeChoice.Now,
+                            movies = SyncScopeChoice.Later, series = SyncScopeChoice.Later,
+                        )
+                    }
+                }.exceptionOrNull()
+                // runCatching must not swallow cancellation: cancelling the job has to stop the loop
+                // rather than record one more failed server and carry on.
+                if (thrown is kotlinx.coroutines.CancellationException) throw thrown
+                when (val imported = importer.state.value) {
+                    is SourceImporter.ImportState.Success -> succeeded.add(entry.name)
+                    is SourceImporter.ImportState.Failed -> failed.add(FailedServer(entry.name, imported.failure, thrown?.message))
+                    else -> failed.add(FailedServer(entry.name, null, thrown?.message ?: imported.toString()))
+                }
+                importer.reset()
+            }
+            _serverList.value = ServerListUi.Done(succeeded, failed, parsed.skipped)
+        }.also { job -> job.invokeOnCompletion { if (serverListJob == job) serverListJob = null } }
+    }
+
+    /** Cancel the bulk run: core's import then cleans up the server it was on, exactly as a single add does. */
+    fun cancelServerList() {
+        serverListJob?.cancel()
+        serverListJob = null
+        importer.reset()
+        _serverList.value = ServerListUi.Idle
+    }
+
+    /** Drop the result so Back out of the step does not show it again on the next visit. */
+    fun resetServerList() { _serverList.value = ServerListUi.Idle }
+
     /**
      * Runs one import in the activity-scoped [viewModelScope] so "Run in background" can walk away
      * from it, then raises the semi-auto EPG prompt if the playlist that just landed has a guide feed.

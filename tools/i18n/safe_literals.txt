@@ -719,9 +719,13 @@
 1	technical	app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt	◀ ▶
 2	empty	app/src/main/java/tv/own/owntv/features/setup/RemoteSetupScreen.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/setup/RemoteSetupScreen.kt	…
-14	empty	app/src/main/java/tv/own/owntv/features/setup/SetupViewModel.kt	\0
-5	empty	app/src/main/java/tv/own/owntv/features/setup/SetupWizard.kt	\0
+16	empty	app/src/main/java/tv/own/owntv/features/setup/SetupViewModel.kt	\0
+8	empty	app/src/main/java/tv/own/owntv/features/setup/SetupWizard.kt	\0
 2	technical	app/src/main/java/tv/own/owntv/features/setup/SetupWizard.kt	+
+1	technical	app/src/main/java/tv/own/owntv/features/setup/SetupWizard.kt	conf
+1	technical	app/src/main/java/tv/own/owntv/features/setup/SetupWizard.kt	csv
+1	technical	app/src/main/java/tv/own/owntv/features/setup/SetupWizard.kt	list
+1	technical	app/src/main/java/tv/own/owntv/features/setup/SetupWizard.kt	txt
 3	technical	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	\0
 1	protocol	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	ass
 1	performance	app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt	epg-preload
