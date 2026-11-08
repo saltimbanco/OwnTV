@@ -100,7 +100,10 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
     // A server-list file has been picked: the browser is gone and the import's own state is showing.
     var serverListFileChosen by remember { mutableStateOf(false) }
     val serverListState by vm.serverList.collectAsStateWithLifecycle()
-    val context = androidx.compose.ui.platform.LocalContext.current
+    // Resources through LocalResources, not LocalContext: the file's text is read in a coroutine and
+    // the default names are formatted there, which must follow the chosen language like every other
+    // string on the screen.
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val ioScope = androidx.compose.runtime.rememberCoroutineScope()
     // Where Back from the backup-restore picker returns to (first-run choice vs. add-content step).
     var backupOrigin by remember { mutableStateOf(Step.ADD_CONTENT) }
@@ -184,8 +187,8 @@ fun Onboarding(firstRun: Boolean, onDone: (Long?) -> Unit, onCancel: () -> Unit,
                         }
                         vm.startServerList(
                             text,
-                            defaultServerName = { i -> context.getString(R.string.settings_bulk_import_default_server, i) },
-                            defaultPortalName = { i -> context.getString(R.string.settings_bulk_import_default_portal, i) },
+                            defaultServerName = { i -> resources.getString(R.string.settings_bulk_import_default_server, i) },
+                            defaultPortalName = { i -> resources.getString(R.string.settings_bulk_import_default_portal, i) },
                             fileLabel = file.name,
                         )
                     }
