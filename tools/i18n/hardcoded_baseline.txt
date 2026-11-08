@@ -21,8 +21,6 @@
 1	app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt	${cfg.host}$p
 1	app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt	:${cfg.port}
 2	app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt	https://
-6	app/src/main/java/tv/own/owntv/features/settings/OpenSubtitlesAccountScreen.kt	\0
-1	app/src/main/java/tv/own/owntv/features/settings/OpenSubtitlesViewModel.kt	OpenSubtitles
 1	app/src/main/java/tv/own/owntv/features/settings/OpenSubtitlesViewModel.kt	manual refresh failed: ${it.javaClass.simpleName}: ${it.message}
 1	app/src/main/java/tv/own/owntv/features/settings/OpenSubtitlesViewModel.kt	sign-in failed: ${e.javaClass.simpleName}: ${e.message}
 1	app/src/main/java/tv/own/owntv/features/settings/SettingsViewModel.kt	UnknownHostException
@@ -36,7 +34,6 @@
 2	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	#FFFFFF
 3	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	vp_server_hop
 4	app/src/main/java/tv/own/owntv/features/settings/VideoPlayerSettingsScreen.kt	vp_server_hop_retries
-1	app/src/main/java/tv/own/owntv/features/shell/components/MediaDetailsScreen.kt	\0
 1	app/src/main/java/tv/own/owntv/ui/components/ColorPicker.kt	#%06X
 1	app/src/main/java/tv/own/owntv/ui/components/TextInputDialog.kt	\0
 1	app/src/main/java/tv/own/owntv/ui/components/TvImeMetrics.kt	$trigger visible=${next.visible} source=${next.source} displayH=$displayHeight
