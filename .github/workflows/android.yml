@@ -177,11 +177,19 @@ jobs:
 
       - name: Compute version (from the git tag on releases)
         id: ver
+        env:
+          # Retired 5.4.x builds left versionCode 50407 on devices; 5.2.x must sit above it.
+          FORK_CODE_OFFSET: 300
         run: |
           if [ "$IS_TAG" = "true" ]; then
             NAME="${GITHUB_REF_NAME#v}"                 # tag v1.2.0 -> 1.2.0
             IFS='.' read -r MA MI PA <<< "$NAME"
-            CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))   # 1.2.0 -> 10200
+            # Fork offset: the retired 5.4.x line shipped versionCode 504xx to real devices before
+            # this fork moved to 5.2.x, and those installs refuse the lower tag-derived code with
+            # INSTALL_FAILED_VERSION_DOWNGRADE (MIUI reports it as "invalid package"). A constant
+            # offset lifts every fork release above that dead line; being constant, it leaves the
+            # ordering between releases exactly as the tags define it.
+            CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} + FORK_CODE_OFFSET ))
             [ "$CODE" -gt 0 ] || CODE=1
           else
             # Dev (non-tag) builds mirror the local-build fallback in app/build.gradle.kts:
